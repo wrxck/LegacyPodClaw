@@ -18,7 +18,7 @@ void CPFetch(NSString *urlString, NSString *method, NSDictionary *headers, NSDat
     NSString *scheme = [[url scheme] lowercaseString];
 
     if ([scheme isEqualToString:@"https"]) {
-        [CPTLSClient request:urlString method:method ?: @"GET" headers:headers body:body
+        [CPTLSClient request:urlString method:method ?: @"GET" headers:headers body:body timeout:timeout
                   completion:^(NSData *data, NSInteger status, NSError *error) { done(data, status, error); }];
         return;
     }

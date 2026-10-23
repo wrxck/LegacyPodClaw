@@ -14,6 +14,9 @@ if grep -q '^clawpod:' /etc/group 2>/dev/null; then
     done
 fi
 
+# a reinstall after a plain remove leaves the purge copy of clawpodd behind
+rm -rf /var/lib/legacypodclaw
+
 # files the app, settings and springboard pass to each other
 mkdir -p "$SHARED"
 chown mobile:mobile "$SHARED"

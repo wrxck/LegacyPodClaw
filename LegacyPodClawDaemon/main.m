@@ -18,6 +18,7 @@
 #import <signal.h>
 #import <sys/sysctl.h>
 #import <unistd.h>
+#import <string.h>
 #import <errno.h>
 #import <dlfcn.h>
 #import <objc/message.h>
@@ -248,6 +249,9 @@ static void DropToMobile(void) {
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
+        /* only this binary carries the keychain group, so the package scripts ask it to clear the secrets */
+        if (argc == 2 && strcmp(argv[1], "--purge-secrets") == 0) return CPSecretServerDeleteAll() ? 0 : 1;
+
         signal(SIGPIPE, SIG_IGN);
         signal(SIGTERM, SIG_IGN);
         dispatch_source_t term = dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, SIGTERM, 0,

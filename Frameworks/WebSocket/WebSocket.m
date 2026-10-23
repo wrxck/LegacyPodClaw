@@ -141,6 +141,9 @@ typedef NS_ENUM(NSUInteger, OCWSParserState) {
     /* Close state */
     BOOL _sentClose;
     BOOL _receivedClose;
+
+    /* the leaf certificate matched the pin; set once per connection */
+    BOOL _peerPinned;
 }
 @end
 
@@ -185,6 +188,7 @@ typedef NS_ENUM(NSUInteger, OCWSParserState) {
     [_delegateQueue release];
     [_lastPongReceived release];
     [_expectedAcceptKey release];
+    [_pinnedCertSHA256 release];
     [super dealloc];
 }
 
@@ -338,11 +342,22 @@ typedef NS_ENUM(NSUInteger, OCWSParserState) {
             switch (eventCode) {
                 case NSStreamEventOpenCompleted:
                     /* Both streams open - send HTTP upgrade handshake */
-                    if (!_handshakeComplete) {
+                    if (!_handshakeComplete && ![self _needsPinCheck]) {
                         [self _sendHandshake];
                     }
                     break;
                 case NSStreamEventHasSpaceAvailable:
+                    /* the tls handshake is done by the first space event, so the peer certificate exists now */
+                    if ([self _needsPinCheck] && !_peerPinned) {
+                        if (![self _peerMatchesPin]) {
+                            [self _failWithCode:OCWSErrorHandshakeFailed
+                                        message:@"The gateway certificate does not match the pinned SHA-256 fingerprint"];
+                            break;
+                        }
+                        _peerPinned = YES;
+                        if (!_handshakeComplete) [self _sendHandshake];
+                        break;
+                    }
                     [self _flushWriteBuffer];
                     break;
                 case NSStreamEventErrorOccurred:
@@ -353,6 +368,40 @@ typedef NS_ENUM(NSUInteger, OCWSParserState) {
             }
         }
     });
+}
+
+#pragma mark - Certificate Pin
+
+- (BOOL)_needsPinCheck {
+    return _allowSelfSignedCerts && [[[_url scheme] lowercaseString] isEqualToString:@"wss"];
+}
+
+static NSString *NormalizedHex(NSString *s) {
+    NSCharacterSet *hex = [NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"];
+    NSMutableString *out = [NSMutableString stringWithCapacity:64];
+    NSString *lower = [s lowercaseString];
+    for (NSUInteger i = 0; i < [lower length]; i++) {
+        unichar c = [lower characterAtIndex:i];
+        if ([hex characterIsMember:c]) [out appendFormat:@"%C", c];
+    }
+    return out;
+}
+
+- (BOOL)_peerMatchesPin {
+    NSString *pin = NormalizedHex(_pinnedCertSHA256 ?: @"");
+    /* no pin means no check at all, so refuse rather than trust any certificate */
+    if ([pin length] != CC_SHA256_DIGEST_LENGTH * 2) return NO;
+    SecTrustRef trust = (SecTrustRef)[_outputStream propertyForKey:(id)kCFStreamPropertySSLPeerTrust];
+    if (!trust || SecTrustGetCertificateCount(trust) < 1) return NO;
+    SecCertificateRef leaf = SecTrustGetCertificateAtIndex(trust, 0);
+    CFDataRef der = SecCertificateCopyData(leaf);
+    if (!der) return NO;
+    uint8_t digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256(CFDataGetBytePtr(der), (CC_LONG)CFDataGetLength(der), digest);
+    CFRelease(der);
+    NSMutableString *got = [NSMutableString stringWithCapacity:64];
+    for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) [got appendFormat:@"%02x", digest[i]];
+    return [got isEqualToString:pin];
 }
 
 #pragma mark - HTTP Upgrade Handshake

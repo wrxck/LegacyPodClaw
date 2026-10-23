@@ -91,8 +91,13 @@ findings_tsv="$(candidates | awk -F'\t' '
 ')"
 
 # the two secret key lists must match, or reads or writes fail at run time
-store_keys="$(grep -A6 'isSecretKey' Frameworks/System/SecretStore.m | grep -o '@"[A-Za-z0-9_]*"' | sort -u | tr '\n' ' ')"
-server_keys="$(grep -A3 'SecretKeys(void)' LegacyPodClawDaemon/SecretServer.m | grep -o '@"[A-Za-z0-9_]*"' | sort -u | tr '\n' ' ')"
+# read each whole function body; a fixed -A count misses keys when the list grows
+key_list() { sed -n "/$2/,/^}/p" "$1" | { grep -o '@"[A-Za-z0-9_]*"' || true; } | sort -u | tr '\n' ' '; }
+store_keys="$(key_list Frameworks/System/SecretStore.m '^+ (NSArray \*)allSecretKeys')"
+server_keys="$(key_list LegacyPodClawDaemon/SecretServer.m '^static NSArray \*SecretKeys(void)')"
+if [[ -z "$store_keys" || -z "$server_keys" ]]; then
+    findings_tsv+=$'\n'"secret"$'\t'"high"$'\t'"Frameworks/System/SecretStore.m"$'\t'"0"$'\t'"could not read a secret key list"$'\t'"update key_list in scan.sh"
+fi
 if [[ "$store_keys" != "$server_keys" ]]; then
     findings_tsv+=$'\n'"secret"$'\t'"blocker"$'\t'"Frameworks/System/SecretStore.m"$'\t'"0"$'\t'"store: $store_keys / server: $server_keys"$'\t'"add the key to both lists"
 fi

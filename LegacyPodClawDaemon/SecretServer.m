@@ -86,6 +86,17 @@ static int32_t KeychainDelete(NSString *key) {
     return s == errSecItemNotFound ? CPSecretStatusOK : StatusFromOSStatus(s);
 }
 
+BOOL CPSecretServerDeleteAll(void) {
+    BOOL ok = YES;
+    for (NSString *key in SecretKeys()) {
+        if (KeychainDelete(key) != CPSecretStatusOK) {
+            NSLog(@"[clawpodd] could not delete %@ from the keychain", key);
+            ok = NO;
+        }
+    }
+    return ok;
+}
+
 #pragma mark - Migration
 
 /* move secrets that older builds left in the plain preferences plist */

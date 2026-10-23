@@ -53,7 +53,7 @@ LegacyPodClaw hooks into iOS via MobileSubstrate to replace system surfaces with
 - Anthropic Messages API (default model `claude-sonnet-5-5`; also `claude-opus-5-5`, `claude-haiku-5-5`, `claude-fable-5-1`)
 - OpenAI-compatible chat completions, shared by OpenAI, Google Gemini (through its OpenAI-compatible endpoint), Groq, Together AI, OpenRouter, Mistral, DeepSeek, Ollama and any custom endpoint
 
-Each provider keeps its own API key in the keychain. HTTPS goes through wolfSSL; plain HTTP is allowed for a local server such as Ollama. There is no automatic failover between providers. The home-button overlay and the Notification Center widget always use Anthropic.
+Each provider keeps its own API key in the keychain. HTTPS goes through wolfSSL; plain HTTP is allowed for a local server such as Ollama. There is no automatic failover between providers. The home-button overlay and the Notification Center widget always use Anthropic. The widget needs the SpringBoard tweak, because it sends HTTPS through the tweak's wolfSSL client.
 
 **Tool System** — Shell execution, file operations, web search, Notes & Reminders (direct database writes), Messages.app integration, system controls (brightness, volume, app launching), YouTube music search & download, device diagnostics, persistent memory.
 

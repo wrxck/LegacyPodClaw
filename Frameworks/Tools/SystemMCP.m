@@ -11,6 +11,7 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <notify.h>
+#import <dlfcn.h>
 
 #define SMS_DB_PATH @"/var/mobile/Library/SMS/sms.db"
 #define CLAWPOD_HANDLE @"LegacyPodClaw"
@@ -270,9 +271,13 @@ static sqlite3 *_openSMSDB(void) {
     [[UIApplication sharedApplication] openURL:url];
 }
 
-+ (void)lockDevice {
-    /* Use GSEventLockDevice or notify SpringBoard */
-    notify_post("com.apple.springboard.lockcomplete");
++ (BOOL)lockDevice {
+    /* lockcomplete only reports a lock; GSEventLockDevice asks springboard to lock, like the sleep button */
+    void *gs = dlopen("/System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices", RTLD_LAZY);
+    void (*lockFn)(void) = gs ? (void (*)(void))dlsym(gs, "GSEventLockDevice") : NULL;
+    if (!lockFn) return NO;
+    lockFn();
+    return YES;
 }
 
 + (void)openURL:(NSString *)urlString {
@@ -420,8 +425,9 @@ static sqlite3 *_openSMSDB(void) {
     t.inputSchema = @{@"type": @"object", @"properties": @{}};
     t.requiresConfirmation = YES;
     t.handler = ^(NSDictionary *p, OCToolResultBlock cb) {
-        [OCSystemControl lockDevice];
-        cb(@"Device locked", nil);
+        if ([OCSystemControl lockDevice]) cb(@"Lock requested", nil);
+        else cb(nil, [NSError errorWithDomain:@"OCSystem" code:1
+                 userInfo:@{NSLocalizedDescriptionKey: @"GSEventLockDevice is not available on this device"}]);
     };
     return t;
 }

@@ -95,6 +95,24 @@
 			<key>PostNotification</key>
 			<string>pro.matthesketh.legacypodclaw/prefsChanged</string>
 		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSEditTextCell</string>
+			<key>defaults</key>
+			<string>pro.matthesketh.legacypodclaw</string>
+			<key>key</key>
+			<string>gatewayCertSHA256</string>
+			<key>label</key>
+			<string>Cert SHA-256</string>
+			<key>placeholder</key>
+			<string>required with self-signed</string>
+			<key>autoCaps</key>
+			<string>none</string>
+			<key>noAutoCorrect</key>
+			<true/>
+			<key>PostNotification</key>
+			<string>pro.matthesketh.legacypodclaw/prefsChanged</string>
+		</dict>
 
 		<!-- Authentication -->
 		<dict>

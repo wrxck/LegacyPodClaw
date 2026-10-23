@@ -22,6 +22,8 @@ static NSString *WSBase64(NSData *data) {
     return r;
 }
 
+NSString *const OCTLSWebSocketCloseCodeKey = @"OCTLSWebSocketCloseCode";
+
 static NSError *WSError(NSString *message) {
     return [NSError errorWithDomain:@"OCTLSWebSocket" code:1 userInfo:@{NSLocalizedDescriptionKey: message}];
 }
@@ -200,7 +202,20 @@ static NSError *WSError(NSString *message) {
     switch (opcode) {
         case 0x9: [self _sendFrame:0xA payload:payload]; return;
         case 0xA: return;
-        case 0x8: [self _failWith:WSError(@"Websocket closed by server")]; return;
+        case 0x8: {
+            /* the close code tells a fatal error (a bad token) from a request to reconnect */
+            if ([payload length] < 2) { [self _failWith:WSError(@"Websocket closed by server")]; return; }
+            const uint8_t *b = [payload bytes];
+            NSInteger code = (b[0] << 8) | b[1];
+            NSString *reason = [[[NSString alloc] initWithBytes:b + 2 length:[payload length] - 2
+                                                       encoding:NSUTF8StringEncoding] autorelease];
+            NSString *message = [reason length]
+                ? [NSString stringWithFormat:@"Websocket closed by server (%ld: %@)", (long)code, reason]
+                : [NSString stringWithFormat:@"Websocket closed by server (%ld)", (long)code];
+            [self _failWith:[NSError errorWithDomain:@"OCTLSWebSocket" code:1 userInfo:@{
+                NSLocalizedDescriptionKey: message, OCTLSWebSocketCloseCodeKey: @(code)}]];
+            return;
+        }
         case 0x1: case 0x2:
             [_message release];
             _message = [payload mutableCopy];

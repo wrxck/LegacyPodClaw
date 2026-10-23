@@ -12,6 +12,11 @@ esac
 
 case "$1" in
     purge)
+        # delete the api keys and tokens; the keychain survives a package removal
+        if [ -x /var/lib/legacypodclaw/clawpodd ]; then
+            /var/lib/legacypodclaw/clawpodd --purge-secrets || echo "LegacyPodClaw: some secrets stay in the keychain; unlock the device and reinstall, then purge again"
+        fi
+        rm -rf /var/lib/legacypodclaw
         rm -rf /var/mobile/Library/LegacyPodClaw
         rm -f /var/mobile/Library/Preferences/pro.matthesketh.legacypodclaw.plist
         ;;

@@ -147,7 +147,7 @@ enum {
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
-        case SettingsSectionGateway:  return 4;
+        case SettingsSectionGateway:  return 5;
         case SettingsSectionAuth:     return 2;
         case SettingsSectionAgent:    return 4;
         case SettingsSectionChannels: return (NSInteger)[[OCChannelSettingsViewController channelIds] count] + 2;
@@ -195,6 +195,12 @@ enum {
                     break;
                 case 2: return [self _switchCell:@"Use TLS" on:[self _prefBool:@"useTLS"] tag:kTagUseTLS];
                 case 3: return [self _switchCell:@"Self-Signed Certs" on:[self _prefBool:@"allowSelfSigned"] tag:kTagSelfSigned];
+                case 4:
+                    /* self-signed mode trusts only this certificate */
+                    cell.textLabel.text = @"Cert SHA-256";
+                    cell.detailTextLabel.text = [[self _prefString:@"gatewayCertSHA256"] length] > 0 ? @"Pinned" : @"Not set";
+                    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                    break;
             }
             break;
         }
@@ -334,6 +340,9 @@ enum {
             [self _showInput:@"Gateway Host" key:@"gatewayHost" placeholder:@"192.168.1.x" secure:NO];
         } else if (indexPath.row == 1) {
             [self _showInput:@"Gateway Port" key:@"gatewayPort" placeholder:@"18789" secure:NO];
+        } else if (indexPath.row == 4) {
+            [self _showInput:@"Certificate SHA-256 (openssl x509 -noout -fingerprint -sha256)" key:@"gatewayCertSHA256"
+                 placeholder:@"AB:CD:..." secure:NO];
         }
     } else if (indexPath.section == SettingsSectionAuth) {
         if (indexPath.row == 0) {

@@ -135,6 +135,8 @@ typedef void(^OCGatewayHistoryBlock)(NSArray *messages, NSError *error);
 @property (nonatomic, assign) NSUInteger port;
 @property (nonatomic, assign) BOOL useTLS;
 @property (nonatomic, assign) BOOL allowSelfSignedCerts;
+/* required with allowSelfSignedCerts: sha-256 of the gateway's certificate */
+@property (nonatomic, copy) NSString *pinnedCertSHA256;
 
 /* Client identity */
 @property (nonatomic, copy) NSString *clientId;

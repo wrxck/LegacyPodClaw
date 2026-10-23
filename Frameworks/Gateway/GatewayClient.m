@@ -134,7 +134,7 @@ static NSString *const kFrameTypeEvent = @"event";
     [_pendingRequests release];
     [_chatStreamBlocks release];
     [_clientId release]; [_clientDisplayName release]; [_clientVersion release];
-    [_deviceId release]; [_host release]; [_authConfig release];
+    [_deviceId release]; [_host release]; [_authConfig release]; [_pinnedCertSHA256 release];
     [_serverInfo release]; [_challengeNonce release];
     [_lastTickReceived release];
     [_clientQueue release]; [_delegateQueue release];
@@ -190,6 +190,7 @@ static NSString *const kFrameTypeEvent = @"event";
     _ws = [[OCWebSocket alloc] initWithURL:url];
     _ws.delegate = self;
     _ws.allowSelfSignedCerts = _allowSelfSignedCerts;
+    _ws.pinnedCertSHA256 = _pinnedCertSHA256;
     _ws.delegateQueue = _clientQueue;
     _ws.pingInterval = 0;  /* We handle keepalive via gateway ticks */
     [_ws open];

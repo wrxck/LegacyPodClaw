@@ -69,7 +69,7 @@
 + (void)launchApp:(NSString *)bundleId;
 
 /* Lock the device */
-+ (void)lockDevice;
++ (BOOL)lockDevice;
 
 /* Open a URL */
 + (void)openURL:(NSString *)urlString;

@@ -78,7 +78,9 @@ extern const NSInteger OCWSErrorPayloadTooLarge;
 @property (nonatomic, assign) NSUInteger maxMessageSize;     // Default 4MB
 @property (nonatomic, assign) NSUInteger readBufferSize;     // Default 4KB (conservative)
 @property (nonatomic, assign) NSTimeInterval pingInterval;   // Default 30s, 0 to disable
+/* with allowSelfSignedCerts the chain is not checked, so the leaf must match this sha-256 (hex, colons allowed) */
 @property (nonatomic, assign) BOOL allowSelfSignedCerts;
+@property (nonatomic, copy)   NSString *pinnedCertSHA256;
 @property (nonatomic, copy)   NSDictionary *customHeaders;
 @property (nonatomic, copy)   NSArray *requestedProtocols;
 

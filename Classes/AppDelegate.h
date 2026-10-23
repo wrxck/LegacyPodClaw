@@ -18,7 +18,8 @@
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate,
                                        OCGatewayClientDelegate,
-                                       OCSessionManagerDelegate>
+                                       OCSessionManagerDelegate,
+                                       UIAlertViewDelegate>
 
 @property (nonatomic, retain) UIWindow *window;
 @property (nonatomic, retain) OCRootViewController *rootViewController;

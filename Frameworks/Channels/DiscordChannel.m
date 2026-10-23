@@ -90,6 +90,22 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
 - (void)webSocketDidOpen:(OCTLSWebSocket *)ws {}
 
 - (void)webSocket:(OCTLSWebSocket *)ws didCloseWithError:(NSError *)error {
+    /* these codes fail the same way on every retry, so stop and show why */
+    NSInteger code = [[[error userInfo] objectForKey:OCTLSWebSocketCloseCodeKey] integerValue];
+    NSString *fatal = nil;
+    switch (code) {
+        case 4004: fatal = @"Discord refused the bot token (4004). Check the token in Settings."; break;
+        case 4010: case 4011: fatal = [NSString stringWithFormat:@"Discord refused the shard settings (%ld).", (long)code]; break;
+        case 4012: fatal = @"Discord refused the gateway version (4012)."; break;
+        case 4013: case 4014: fatal = [NSString stringWithFormat:@"Discord refused the intents (%ld). "
+            @"Turn on Message Content Intent in the developer portal.", (long)code]; break;
+    }
+    if (fatal) {
+        [self stop];
+        [_lastError release]; _lastError = [fatal copy];
+        NSLog(@"[Discord] %@", fatal);
+        return;
+    }
     [self _reconnectWithReason:[error localizedDescription]];
 }
 

@@ -20,6 +20,7 @@
 #import "IRCChannel.h"
 #import "WebhookChannel.h"
 #import <notify.h>
+#import <sys/stat.h>
 
 static NSString *const LPCPrefsPath = @"/var/mobile/Library/Preferences/pro.matthesketh.legacypodclaw.plist";
 
@@ -264,6 +265,7 @@ static AppDelegate *_shared = nil;
     if (_gateway.port == 0) _gateway.port = 18789;
     _gateway.useTLS = [[prefs objectForKey:@"useTLS"] boolValue];
     _gateway.allowSelfSignedCerts = [[prefs objectForKey:@"allowSelfSigned"] boolValue];
+    _gateway.pinnedCertSHA256 = [prefs objectForKey:@"gatewayCertSHA256"];
 
     OCGatewayAuthConfig *auth = [[OCGatewayAuthConfig alloc] init];
     auth.token = [CPSecretStore secretForKey:@"authToken"];
@@ -328,6 +330,42 @@ static AppDelegate *_shared = nil;
         dispatch_get_main_queue(), ^(int t) {
             [self _autoStart];
         });
+}
+
+#pragma mark - URL Scheme
+
+static const NSInteger kTagStartGateway = 8101;
+
+/* any app can open a url, so openclaw://gateway only asks; the user starts the server */
+- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url
+  sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
+    if (![[[url scheme] lowercaseString] isEqualToString:@"openclaw"]) return NO;
+    if ([[url host] isEqualToString:@"gateway"] && !_gatewayServer.isRunning) {
+        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Start Gateway Server?"
+            message:@"Other devices on this network can then connect with the access token."
+            delegate:self cancelButtonTitle:@"Cancel" otherButtonTitles:@"Start", nil];
+        alert.tag = kTagStartGateway;
+        [alert show];
+        [alert release];
+    }
+    return YES;
+}
+
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
+    if (alertView.tag != kTagStartGateway || buttonIndex != 1) return;
+    NSError *err = nil;
+    if (![self startGatewayServer:&err]) {
+        UIAlertView *fail = [[UIAlertView alloc] initWithTitle:@"Gateway Not Started"
+            message:[err localizedDescription] ?: @"The server did not start."
+            delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil];
+        [fail show];
+        [fail release];
+        return;
+    }
+    /* remember the choice the same way the settings switch does */
+    NSMutableDictionary *prefs = [NSMutableDictionary dictionaryWithContentsOfFile:LPCPrefsPath] ?: [NSMutableDictionary dictionary];
+    [prefs setObject:@YES forKey:@"gatewayServerEnabled"];
+    if ([prefs writeToFile:LPCPrefsPath atomically:YES]) chmod([LPCPrefsPath fileSystemRepresentation], 0600);
 }
 
 #pragma mark - Gateway Server

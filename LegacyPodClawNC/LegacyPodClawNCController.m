@@ -8,6 +8,7 @@
  */
 
 #import "SecretStore.h"
+#import "TLSClient.h"
 #import "LegacyPodClawNCController.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -26,11 +27,8 @@
     UIActivityIndicatorView *_spinner;
     BOOL _isExpanded;
     BOOL _isProcessing;
-    NSURLConnection *_conn;
-    NSMutableData *_respData;
     NSMutableData *_sseBuf;
     NSMutableString *_streamBuf;
-    NSInteger _status;
 }
 @end
 
@@ -148,7 +146,7 @@ static BOOL LPCModelAlwaysThinks(NSString *model) {
 - (void)dealloc {
     [_view release]; [_titleLabel release]; [_statusLabel release];
     [_responseLabel release]; [_quickInput release]; [_askButton release];
-    [_spinner release]; [_conn release]; [_respData release];
+    [_spinner release];
     [_sseBuf release]; [_streamBuf release];
     [super dealloc];
 }
@@ -242,7 +240,6 @@ static BOOL LPCModelAlwaysThinks(NSString *model) {
     _streamBuf = [[NSMutableString alloc] init];
     [_sseBuf release];
     _sseBuf = [[NSMutableData alloc] init];
-    _status = 0;
 
     /* Expand to show response */
     [self _expand];
@@ -250,14 +247,8 @@ static BOOL LPCModelAlwaysThinks(NSString *model) {
     _responseLabel.text = @"Thinking...";
     _responseLabel.textColor = [UIColor colorWithWhite:0.6f alpha:1];
 
-    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:
-        [NSURL URLWithString:@"https://api.anthropic.com/v1/messages"]
-        cachePolicy:NSURLRequestReloadIgnoringCacheData timeoutInterval:60];
-    [req setHTTPMethod:@"POST"];
-    [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [req setValue:@"2023-06-01" forHTTPHeaderField:@"anthropic-version"];
-    [req setValue:apiKey forHTTPHeaderField:@"x-api-key"];
-    [req setValue:@"text/event-stream" forHTTPHeaderField:@"Accept"];
+    NSDictionary *headers = @{@"Content-Type": @"application/json", @"anthropic-version": @"2023-06-01",
+                              @"x-api-key": apiKey, @"Accept": @"text/event-stream"};
 
     NSMutableDictionary *body = [NSMutableDictionary dictionaryWithDictionary:@{
         @"model": model,
@@ -272,23 +263,37 @@ static BOOL LPCModelAlwaysThinks(NSString *model) {
         [body setObject:@(2048) forKey:@"max_tokens"];
         [body setObject:@{@"effort": @"low"} forKey:@"output_config"];
     }
-    [req setHTTPBody:[NSJSONSerialization dataWithJSONObject:body options:0 error:nil]];
+    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
 
-    [_respData release];
-    _respData = [[NSMutableData alloc] initWithCapacity:2048];
-    [_conn release];
-    _conn = [[NSURLConnection alloc] initWithRequest:req delegate:self startImmediately:YES];
+    /* the tweak links wolfssl into springboard; the ios 6 tls stack cannot reach the api safely */
+    Class tls = NSClassFromString(@"CPTLSClient");
+    if (!tls) {
+        [self _showResponse:@"The LegacyPodClaw tweak is not loaded. Respring and try again."];
+        return;
+    }
+    [tls streamRequest:@"https://api.anthropic.com/v1/messages" method:@"POST" headers:headers body:bodyData
+               onChunk:^(NSData *chunk) { [self _consumeEvents:chunk]; }
+            completion:^(NSData *data, NSInteger status, NSError *error) {
+        if (error) {
+            [self _showResponse:[NSString stringWithFormat:@"Error: %@", [error localizedDescription]]];
+        } else if (status < 200 || status >= 300) {
+            NSDictionary *json = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+            id err = [json isKindOfClass:[NSDictionary class]] ? [json objectForKey:@"error"] : nil;
+            NSString *message = [err isKindOfClass:[NSDictionary class]] ? [err objectForKey:@"message"] : nil;
+            [self _showResponse:[NSString stringWithFormat:@"Error %ld: %@", (long)status, message ?: @"request failed"]];
+        } else {
+            _isProcessing = NO;
+            _askButton.hidden = NO;
+            [_spinner stopAnimating];
+            _quickInput.text = @"";
+        }
+    }];
 }
 
 #pragma mark - Streaming
 
-- (void)connection:(NSURLConnection *)c didReceiveResponse:(NSURLResponse *)response {
-    _status = [response isKindOfClass:[NSHTTPURLResponse class]] ? [(NSHTTPURLResponse *)response statusCode] : 0;
-}
-
-- (void)connection:(NSURLConnection *)c didReceiveData:(NSData *)data {
-    /* an error body is json, not events */
-    if (_status >= 400) { [_respData appendData:data]; return; }
+/* chunks arrive on the main queue */
+- (void)_consumeEvents:(NSData *)data {
     /* decode only whole lines, so a multi-byte character split across chunks is not lost */
     [_sseBuf appendData:data];
     const uint8_t *bytes = [_sseBuf bytes];
@@ -307,40 +312,16 @@ static BOOL LPCModelAlwaysThinks(NSString *model) {
         if ([json isEqualToString:@"[DONE]"]) continue;
         NSDictionary *evt = [NSJSONSerialization JSONObjectWithData:
             [json dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
-        if (!evt) continue;
+        if (![evt isKindOfClass:[NSDictionary class]]) continue;
         if ([[evt objectForKey:@"type"] isEqualToString:@"content_block_delta"]) {
             NSString *text = [[evt objectForKey:@"delta"] objectForKey:@"text"];
-            if (text) {
+            if ([text isKindOfClass:[NSString class]]) {
                 [_streamBuf appendString:text];
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    _responseLabel.textColor = [UIColor colorWithWhite:0.9f alpha:1];
-                    _responseLabel.text = _streamBuf;
-                });
+                _responseLabel.textColor = [UIColor colorWithWhite:0.9f alpha:1];
+                _responseLabel.text = _streamBuf;
             }
         }
     }
-}
-
-- (void)connectionDidFinishLoading:(NSURLConnection *)c {
-    if (_status >= 400) {
-        NSDictionary *body = [NSJSONSerialization JSONObjectWithData:_respData options:0 error:nil];
-        id err = [body isKindOfClass:[NSDictionary class]] ? [body objectForKey:@"error"] : nil;
-        NSString *message = [err isKindOfClass:[NSDictionary class]] ? [err objectForKey:@"message"] : nil;
-        [self _showResponse:[NSString stringWithFormat:@"Error %ld: %@", (long)_status, message ?: @"request failed"]];
-        return;
-    }
-    dispatch_async(dispatch_get_main_queue(), ^{
-        _isProcessing = NO;
-        _askButton.hidden = NO;
-        [_spinner stopAnimating];
-        _quickInput.text = @"";
-    });
-}
-
-- (void)connection:(NSURLConnection *)c didFailWithError:(NSError *)error {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self _showResponse:[NSString stringWithFormat:@"Error: %@", [error localizedDescription]]];
-    });
 }
 
 #pragma mark - Display

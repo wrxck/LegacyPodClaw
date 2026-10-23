@@ -30,6 +30,14 @@ typedef void(^CPHTTPSStreamChunk)(NSData *chunk);
            body:(NSData *)body
      completion:(CPHTTPSCompletion)completion;
 
+/* timeout bounds the whole request; 0 means the default budget of 600 s */
++ (void)request:(NSString *)urlString
+         method:(NSString *)method
+        headers:(NSDictionary *)headers
+           body:(NSData *)body
+        timeout:(NSTimeInterval)timeout
+     completion:(CPHTTPSCompletion)completion;
+
 /* onChunk receives decoded body bytes on the main queue as they arrive; completion gets the body only for a non-2xx status */
 + (void)streamRequest:(NSString *)urlString
                method:(NSString *)method

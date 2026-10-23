@@ -4,4 +4,13 @@
 # stop the daemon so dpkg can replace or remove its binary
 launchctl unload /Library/LaunchDaemons/pro.matthesketh.legacypodclaw.daemon.plist 2>/dev/null
 
+# postrm purge runs after dpkg deletes clawpodd, and only clawpodd may touch the keychain items;
+# keep a copy where only root can write, so mobile cannot swap in a binary that root then runs
+if [ "$1" = "remove" ] && [ -x /usr/bin/clawpodd ]; then
+    mkdir -p /var/lib/legacypodclaw
+    chown root:wheel /var/lib/legacypodclaw
+    chmod 700 /var/lib/legacypodclaw
+    cp -p /usr/bin/clawpodd /var/lib/legacypodclaw/clawpodd
+fi
+
 exit 0

@@ -944,6 +944,20 @@ static NSString *const kCPWidgetSectionID = @"pro.matthesketh.legacypodclaw.nc-w
 
 static UILabel *_lsLabel = nil;
 
+static void CPUpdateLockLabel(void) {
+    if (!_lsLabel) return;
+    NSDictionary *prefs = [NSDictionary dictionaryWithContentsOfFile:PREFS_PATH];
+    NSString *host = [prefs objectForKey:@"gatewayHost"];
+    BOOL hasKey = [[CPSecretStore secretForKey:@"apiKey"] length] > 0;
+
+    if (host && [host length] > 0)
+        _lsLabel.text = [NSString stringWithFormat:@"LegacyPodClaw - %@", host];
+    else if (hasKey)
+        _lsLabel.text = @"LegacyPodClaw - Ready";
+    else
+        _lsLabel.text = @"LegacyPodClaw";
+}
+
 %hook SBAwayView
 
 - (void)didMoveToWindow {
@@ -972,19 +986,7 @@ static UILabel *_lsLabel = nil;
         }
     } @catch (NSException *e) {}
 
-    /* Update text */
-    if (_lsLabel) {
-        NSDictionary *prefs = [NSDictionary dictionaryWithContentsOfFile:PREFS_PATH];
-        NSString *host = [prefs objectForKey:@"gatewayHost"];
-        BOOL hasKey = [[CPSecretStore secretForKey:@"apiKey"] length] > 0;
-
-        if (host && [host length] > 0)
-            _lsLabel.text = [NSString stringWithFormat:@"LegacyPodClaw - %@", host];
-        else if (hasKey)
-            _lsLabel.text = @"LegacyPodClaw - Ready";
-        else
-            _lsLabel.text = @"LegacyPodClaw";
-    }
+    CPUpdateLockLabel();
 }
 
 %end
@@ -1189,6 +1191,16 @@ static void CPUnlockAndShow(id away) {
             if (_cpPanel.isVisible) [_cpPanel dismiss];
             _cpWindow.hidden = YES;
         });
+
+    /* settings change the gateway host or key; the lock label must not wait for the next lock */
+    int prefsToken;
+    notify_register_dispatch("pro.matthesketh.legacypodclaw/prefsChanged", &prefsToken,
+        dispatch_get_main_queue(), ^(int t) { CPUpdateLockLabel(); });
+
+    /* the settings test button; CPShow refuses while the device is locked */
+    int overlayToken;
+    notify_register_dispatch("pro.matthesketh.legacypodclaw/showOverlay", &overlayToken,
+        dispatch_get_main_queue(), ^(int t) { CPShow(); });
 
     /* Listen for banner requests */
     int bannerToken;
@@ -1587,7 +1599,9 @@ static void _cpRestoreDockAndCleanup(id self_) {
             } @catch (NSException *e) {}
             break;
         }
-        case 3: notify_post("pro.matthesketh.legacypodclaw/startGateway"); break; /* Gateway */
+        case 3: /* Gateway: the app asks before it opens a listening port */
+            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"openclaw://gateway"]];
+            break;
         case 4: [[UIApplication sharedApplication] openURL:
                  [NSURL URLWithString:@"prefs:"]]; break; /* Settings - opens Settings.app */
         case 5: { /* Respring */

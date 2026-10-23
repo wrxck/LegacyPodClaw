@@ -30,6 +30,8 @@ of an attack. They do not stop code that already runs as `mobile` or root.
   callers are refused.
 - The app binary has a `__RESTRICT` segment, so dyld ignores
   `DYLD_INSERT_LIBRARIES` for it.
+- `dpkg --purge` deletes the secrets from the keychain. A plain remove
+  keeps them, like the other settings.
 - Known gaps: a tweak inside SpringBoard can read every secret, and a
   process that sends a request and then execs an allowed binary can pass
   the path check.
@@ -64,6 +66,13 @@ of an attack. They do not stop code that already runs as `mobile` or root.
   Only `GET /healthz` is public, and it returns no data.
 - Request size, header size and time are bounded.
 
+## Gateway client
+
+- The connection to a remote gateway uses the system TLS stack. With
+  "Self-Signed Certs" on, the app does not check the chain. It then
+  connects only when the leaf certificate's SHA-256 matches the pinned
+  fingerprint, and refuses when no fingerprint is set.
+
 ## Chat channels
 
 - Each channel ignores senders that are not on its allow list.
@@ -78,7 +87,10 @@ of an attack. They do not stop code that already runs as `mobile` or root.
 
 ## SpringBoard tweak
 
-- The overlay never shows while the device is locked.
+- The overlay never shows while the device is locked, and it hides when
+  the device locks.
+- The Notification Center widget does not run while the device is locked
+  with a passcode. It sends HTTPS through the tweak's wolfSSL client.
 - With a passcode set, the lock screen camera keeps Apple's behaviour.
 - Files that the app passes to SpringBoard live in a 0700 directory, not
   in `/tmp`.

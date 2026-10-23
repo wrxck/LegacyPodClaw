@@ -9,3 +9,6 @@
 BOOL CPSecretServerStart(void);
 
 void CPSecretServerMigrate(void);
+
+/* deletes every secret from the keychain; dpkg --purge runs it, so nothing stays after a complete removal */
+BOOL CPSecretServerDeleteAll(void);

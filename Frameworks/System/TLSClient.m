@@ -12,6 +12,7 @@
 #import <errno.h>
 #import <ctype.h>
 #import <unistd.h>
+#import <math.h>
 
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/ssl.h>
@@ -200,8 +201,15 @@ static WOLFSSL *OpenTLS(int sock, NSString *host, NSError **outError) {
 + (void)request:(NSString *)urlString method:(NSString *)method
         headers:(NSDictionary *)headers body:(NSData *)body
      completion:(CPHTTPSCompletion)completion {
-    [self streamRequest:urlString method:method headers:headers body:body
-                onChunk:nil completion:completion];
+    [self request:urlString method:method headers:headers body:body timeout:0 completion:completion];
+}
+
++ (void)request:(NSString *)urlString method:(NSString *)method
+        headers:(NSDictionary *)headers body:(NSData *)body
+        timeout:(NSTimeInterval)timeout
+     completion:(CPHTTPSCompletion)completion {
+    [self _request:urlString method:method headers:headers body:body onChunk:nil
+           timeout:timeout completion:completion];
 }
 
 + (void)setPinnedSPKIHashes:(NSArray *)hashes forHost:(NSString *)host {
@@ -222,6 +230,15 @@ static WOLFSSL *OpenTLS(int sock, NSString *host, NSError **outError) {
               headers:(NSDictionary *)headers body:(NSData *)body
               onChunk:(CPHTTPSStreamChunk)onChunk
            completion:(CPHTTPSCompletion)completion {
+    [self _request:urlString method:method headers:headers body:body onChunk:onChunk
+           timeout:0 completion:completion];
+}
+
++ (void)_request:(NSString *)urlString method:(NSString *)method
+         headers:(NSDictionary *)headers body:(NSData *)body
+         onChunk:(CPHTTPSStreamChunk)onChunk
+         timeout:(NSTimeInterval)timeout
+      completion:(CPHTTPSCompletion)completion {
 
     CPHTTPSCompletion done = [[completion copy] autorelease];
     CPHTTPSStreamChunk chunkHandler = [[onChunk copy] autorelease];
@@ -232,7 +249,7 @@ static WOLFSSL *OpenTLS(int sock, NSString *host, NSError **outError) {
             NSInteger status = 0;
             NSError *error = nil;
             [self performRequest:urlString method:method headers:headers body:body
-                         onChunk:chunkHandler body:&responseBody status:&status error:&error];
+                         onChunk:chunkHandler timeout:timeout body:&responseBody status:&status error:&error];
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (done) done(responseBody, status, error);
             });
@@ -243,7 +260,9 @@ static WOLFSSL *OpenTLS(int sock, NSString *host, NSError **outError) {
 + (void)performRequest:(NSString *)urlString method:(NSString *)method
                headers:(NSDictionary *)headers body:(NSData *)body
                onChunk:(CPHTTPSStreamChunk)onChunk
+               timeout:(NSTimeInterval)timeout
                   body:(NSData **)outBody status:(NSInteger *)outStatus error:(NSError **)outError {
+    NSTimeInterval budget = timeout > 0 ? MIN(timeout, kRequestBudgetSec) : kRequestBudgetSec;
 
     NSURL *url = [NSURL URLWithString:urlString];
     NSString *host = [url host];
@@ -263,6 +282,12 @@ static WOLFSSL *OpenTLS(int sock, NSString *host, NSError **outError) {
     int port = [url port] ? [[url port] intValue] : 443;
     int sock = ConnectSocket(host, port, outError);
     if (sock < 0) return;
+    if (budget < kIOTimeoutSec) {
+        /* one blocking read must not outlast the caller's budget */
+        struct timeval tv = { .tv_sec = (time_t)ceil(budget), .tv_usec = 0 };
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    }
 
     WOLFSSL *ssl = OpenTLS(sock, host, outError);
     if (!ssl) { close(sock); return; }
@@ -300,10 +325,10 @@ static WOLFSSL *OpenTLS(int sock, NSString *host, NSError **outError) {
 
         CPHTTPResponseParser *parser = [[[CPHTTPResponseParser alloc] initWithChunkHandler:onChunk] autorelease];
         char buf[8192];
-        NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:kRequestBudgetSec];
+        NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:budget];
         while (!parser->complete) {
             if ([deadline timeIntervalSinceNow] <= 0) {
-                *outError = TLSError(CPTLSErrorIO, [NSString stringWithFormat:@"%@ took longer than %.0f s", host, kRequestBudgetSec]);
+                *outError = TLSError(CPTLSErrorIO, [NSString stringWithFormat:@"%@ took longer than %.0f s", host, budget]);
                 break;
             }
             int n = wolfSSL_read(ssl, buf, sizeof(buf));

@@ -291,13 +291,8 @@ static BOOL WriteSecret(id value, PSSpecifier *specifier) {
 }
 
 - (void)testOverlay {
-    /* Tell the tweak to show the overlay */
+    /* the tweak listens for this and opens the panel over the current screen */
     notify_post("pro.matthesketh.legacypodclaw/showOverlay");
-
-    UIAlertView *a = [[UIAlertView alloc] initWithTitle:@"Overlay"
-        message:@"Press Home to return to SpringBoard, then hold Home to see the overlay."
-        delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil];
-    [a show]; [a release];
 }
 
 - (void)testBrightness {

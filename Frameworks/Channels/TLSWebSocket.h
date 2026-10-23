@@ -5,6 +5,9 @@
 
 @class OCTLSWebSocket;
 
+/* the userInfo key that holds the server's close code as an NSNumber, when it sent one */
+extern NSString *const OCTLSWebSocketCloseCodeKey;
+
 /* all callbacks arrive on the main queue */
 @protocol OCTLSWebSocketDelegate <NSObject>
 - (void)webSocketDidOpen:(OCTLSWebSocket *)ws;
