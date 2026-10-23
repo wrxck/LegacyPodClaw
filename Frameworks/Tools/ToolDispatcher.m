@@ -173,10 +173,8 @@ static NSString *CallerText(OCToolCaller caller) {
     }
     NSMutableDictionary *rest = [[input mutableCopy] autorelease];
     [rest removeObjectsForKeys:OCToolApprovalFields()];
-    NSMutableString *message = [NSMutableString stringWithFormat:@"%@ wants to run \"%@\".\n\n%@",
-                                CallerText(caller), tool.name, keyText];
-    if ([rest count]) [message appendFormat:@"\nOther input:\n%@", OCToolOtherInputText(rest)];
-    if (reason) [message appendFormat:@"\n\n%@", reason];
+    NSString *message = OCToolApprovalMessage([NSString stringWithFormat:@"%@ wants to run \"%@\".", CallerText(caller), tool.name],
+                                              keyText, [rest count] ? OCToolOtherInputText(rest) : nil, reason);
     _OCToolConfirmation *c = [[_OCToolConfirmation alloc] initWithTitle:@"Allow Tool?" message:message
         decision:^(BOOL allowed) {
             if (allowed) run();

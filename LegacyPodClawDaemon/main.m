@@ -24,7 +24,7 @@
 #import <objc/message.h>
 #import "SecretServer.h"
 
-#define DAEMON_VERSION @"0.4.1"
+#define DAEMON_VERSION @"0.4.2"
 #define DAEMON_SERVICE @"pro.matthesketh.legacypodclaw.daemon"
 #define MOBILE_UID 501
 #define MOBILE_GID 501

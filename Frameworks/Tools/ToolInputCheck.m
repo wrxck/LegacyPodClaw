@@ -102,6 +102,20 @@ NSString *OCToolOtherInputText(NSDictionary *rest) {
     return text;
 }
 
+NSString *OCToolApprovalMessage(NSString *intro, NSString *keyText, NSString *otherText, NSString *reason) {
+    /* each part ends with a line break; trimming it stops a blank line before "Other input:" */
+    NSCharacterSet *breaks = [NSCharacterSet newlineCharacterSet];
+    NSMutableArray *input = [NSMutableArray array];
+    NSString *keys = [keyText stringByTrimmingCharactersInSet:breaks];
+    if ([keys length]) [input addObject:keys];
+    NSString *other = [otherText stringByTrimmingCharactersInSet:breaks];
+    if ([other length]) [input addObject:[@"Other input:\n" stringByAppendingString:other]];
+    NSMutableString *message = [NSMutableString stringWithString:intro ?: @""];
+    if ([input count]) [message appendFormat:@"\n\n%@", [input componentsJoinedByString:@"\n"]];
+    if ([reason length]) [message appendFormat:@"\n\n%@", reason];
+    return message;
+}
+
 BOOL OCMathExpressionIsSafe(NSString *expression) {
     /* nsexpression runs FUNCTION() and format specifiers, so allow only numbers and arithmetic */
     if ([expression length] == 0 || [expression length] > 500) return NO;

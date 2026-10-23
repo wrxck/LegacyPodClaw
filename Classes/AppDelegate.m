@@ -417,25 +417,62 @@ static NSString *PrefString(NSDictionary *prefs, NSString *key) {
     return [v isKindOfClass:[NSString class]] ? [v stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] : nil;
 }
 
-/* everything a channel is built from; a restart happens only when this changes */
+/* the settings each built-in channel is made from; a channel restarts only when its own entry changes */
+static NSDictionary *ChannelKeys(void) {
+    return @{@"telegram": @[@"telegramEnabled", @"telegramBotToken"],
+             @"discord": @[@"discordEnabled", @"discordBotToken"],
+             @"slack": @[@"slackEnabled", @"slackAppToken", @"slackBotToken"],
+             @"irc": @[@"ircEnabled", @"ircServer", @"ircPort", @"ircTLS", @"ircNick", @"ircChannels", @"ircPassword"],
+             @"webhook": @[@"webhookEnabled", @"webhookCallbackURL", @"webhookCallbackToken"]};
+}
+
 - (NSDictionary *)_channelSettings:(NSDictionary *)prefs {
-    NSMutableDictionary *cfg = [NSMutableDictionary dictionary];
-    for (NSString *key in @[@"telegramEnabled", @"discordEnabled", @"slackEnabled", @"ircEnabled", @"webhookEnabled",
-                            @"ircServer", @"ircPort", @"ircTLS", @"ircNick", @"ircChannels", @"webhookCallbackURL"]) {
-        id v = [prefs objectForKey:key];
-        if (v) [cfg setObject:v forKey:key];
+    NSMutableDictionary *all = [NSMutableDictionary dictionary];
+    NSDictionary *keys = ChannelKeys();
+    for (NSString *cid in keys) {
+        NSMutableDictionary *cfg = [NSMutableDictionary dictionary];
+        /* a turned-off channel needs no keychain read, and its secrets must not count as a change */
+        BOOL on = PrefOn(prefs, [cid stringByAppendingString:@"Enabled"]);
+        for (NSString *key in [keys objectForKey:cid]) {
+            id v = [CPSecretStore isSecretKey:key] ? (on ? [CPSecretStore secretForKey:key] : nil) : [prefs objectForKey:key];
+            if (v) [cfg setObject:v forKey:key];
+        }
+        [all setObject:cfg forKey:cid];
     }
-    NSArray *secrets = @[];
-    if (PrefOn(prefs, @"telegramEnabled")) secrets = [secrets arrayByAddingObject:@"telegramBotToken"];
-    if (PrefOn(prefs, @"discordEnabled")) secrets = [secrets arrayByAddingObject:@"discordBotToken"];
-    if (PrefOn(prefs, @"slackEnabled")) secrets = [secrets arrayByAddingObjectsFromArray:@[@"slackAppToken", @"slackBotToken"]];
-    if (PrefOn(prefs, @"ircEnabled")) secrets = [secrets arrayByAddingObject:@"ircPassword"];
-    if (PrefOn(prefs, @"webhookEnabled")) secrets = [secrets arrayByAddingObject:@"webhookCallbackToken"];
-    for (NSString *key in secrets) {
-        NSString *v = [CPSecretStore secretForKey:key];
-        if (v) [cfg setObject:v forKey:key];
+    return all;
+}
+
+- (id<OCChannel>)_makeChannel:(NSString *)cid settings:(NSDictionary *)cfg {
+    if (!PrefOn(cfg, [cid stringByAppendingString:@"Enabled"])) return nil;
+    if ([cid isEqualToString:@"telegram"]) {
+        NSString *tg = [cfg objectForKey:@"telegramBotToken"];
+        return [tg length] ? [[[OCTelegramChannel alloc] initWithBotToken:tg] autorelease] : nil;
     }
-    return cfg;
+    if ([cid isEqualToString:@"discord"]) {
+        NSString *dc = [cfg objectForKey:@"discordBotToken"];
+        return [dc length] ? [[[OCDiscordChannel alloc] initWithBotToken:dc] autorelease] : nil;
+    }
+    if ([cid isEqualToString:@"slack"]) {
+        NSString *slackApp = [cfg objectForKey:@"slackAppToken"], *slackBot = [cfg objectForKey:@"slackBotToken"];
+        if (![slackApp length] || ![slackBot length]) return nil;
+        return [[[OCSlackChannel alloc] initWithAppToken:slackApp botToken:slackBot] autorelease];
+    }
+    if ([cid isEqualToString:@"irc"]) {
+        NSString *server = PrefString(cfg, @"ircServer"), *nick = PrefString(cfg, @"ircNick");
+        if (![server length] || ![nick length]) return nil;
+        OCIRCChannel *irc = [[[OCIRCChannel alloc] initWithServer:server port:[PrefString(cfg, @"ircPort") intValue]
+                                                           useTLS:PrefOn(cfg, @"ircTLS") nickname:nick] autorelease];
+        irc.password = [cfg objectForKey:@"ircPassword"];
+        irc.channels = OCListFromString(PrefString(cfg, @"ircChannels"));
+        return irc;
+    }
+    if ([cid isEqualToString:@"webhook"]) {
+        NSString *callback = PrefString(cfg, @"webhookCallbackURL");
+        if (![callback length]) return nil;
+        return [[[OCWebhookChannel alloc] initWithCallbackURL:callback
+                                                  bearerToken:[cfg objectForKey:@"webhookCallbackToken"]] autorelease];
+    }
+    return nil;
 }
 
 - (void)_reloadChannels:(NSDictionary *)prefs {
@@ -451,48 +488,51 @@ static NSString *PrefString(NSDictionary *prefs, NSString *key) {
     _channelRouter.maxContextTokens = MIN(_localAgent.modelConfig.contextWindow ?: 2048, (NSUInteger)4096);
     _channelRouter.toolsEnabled = PrefOn(prefs, @"channelToolsEnabled");
 
-    NSDictionary *cfg = [self _channelSettings:prefs];
+    NSArray *pluginChannels = [_pluginManager allPluginChannels];
     NSMutableArray *ids = [NSMutableArray arrayWithObjects:@"telegram", @"discord", @"slack", @"irc", @"webhook", nil];
-    for (id<OCChannel> ch in [_pluginManager allPluginChannels]) [ids addObject:[ch channelId]];
+    for (id<OCChannel> ch in pluginChannels) [ids addObject:[ch channelId]];
     for (NSString *cid in ids) {
         [_channelRouter setAllowedSenders:OCListFromString(PrefString(prefs, [cid stringByAppendingString:@"AllowedIds"]))
                                forChannel:cid];
     }
 
-    if (_channelSettings && [_channelSettings isEqualToDictionary:cfg]) return;
+    NSDictionary *cfg = [self _channelSettings:prefs];
+    NSUInteger restarted = 0;
+    for (NSString *cid in @[@"telegram", @"discord", @"slack", @"irc", @"webhook"]) {
+        NSDictionary *mine = [cfg objectForKey:cid];
+        /* a restart drops the open link and every chat on it, so leave a channel whose settings did not change */
+        if (_channelSettings && [[_channelSettings objectForKey:cid] isEqualToDictionary:mine]) continue;
+        id<OCChannel> old = [_channelManager channelForId:cid];
+        if (old && [pluginChannels containsObject:old]) {
+            NSLog(@"[LegacyPodClaw] plugin channel %@ clashes with a built-in channel", cid);
+            continue;
+        }
+        [_channelManager removeChannel:cid];
+        [_channelRouter resetChannel:cid];
+        id<OCChannel> ch = [self _makeChannel:cid settings:mine];
+        if (ch && [_channelManager registerChannel:ch]) [ch start];
+        restarted++;
+    }
+    /* a plugin that was unloaded leaves its channel registered unless it is removed here */
+    NSArray *builtIn = @[@"telegram", @"discord", @"slack", @"irc", @"webhook"];
+    for (id<OCChannel> ch in [[[_channelManager channels] copy] autorelease]) {
+        if ([builtIn containsObject:[ch channelId]] || [pluginChannels containsObject:ch]) continue;
+        NSString *gone = [[[ch channelId] copy] autorelease];
+        [_channelManager removeChannel:gone];
+        [_channelRouter resetChannel:gone];
+    }
+    for (id<OCChannel> ch in pluginChannels) {
+        if ([_channelManager channelForId:[ch channelId]] == ch) continue;
+        if ([_channelManager registerChannel:ch]) {
+            if ([ch isConfigured]) [ch start];
+        } else {
+            NSLog(@"[LegacyPodClaw] plugin channel %@ clashes with another channel", [ch channelId]);
+        }
+    }
     [_channelSettings release];
     _channelSettings = [cfg retain];
-
-    [_channelManager removeAllChannels];
-    [_channelRouter reset];
-
-    NSString *tg = [cfg objectForKey:@"telegramBotToken"];
-    if (PrefOn(prefs, @"telegramEnabled") && [tg length])
-        [_channelManager registerChannel:[[[OCTelegramChannel alloc] initWithBotToken:tg] autorelease]];
-    NSString *dc = [cfg objectForKey:@"discordBotToken"];
-    if (PrefOn(prefs, @"discordEnabled") && [dc length])
-        [_channelManager registerChannel:[[[OCDiscordChannel alloc] initWithBotToken:dc] autorelease]];
-    NSString *slackApp = [cfg objectForKey:@"slackAppToken"], *slackBot = [cfg objectForKey:@"slackBotToken"];
-    if (PrefOn(prefs, @"slackEnabled") && [slackApp length] && [slackBot length])
-        [_channelManager registerChannel:[[[OCSlackChannel alloc] initWithAppToken:slackApp botToken:slackBot] autorelease]];
-    NSString *server = PrefString(prefs, @"ircServer"), *nick = PrefString(prefs, @"ircNick");
-    if (PrefOn(prefs, @"ircEnabled") && [server length] && [nick length]) {
-        OCIRCChannel *irc = [[[OCIRCChannel alloc] initWithServer:server port:[PrefString(prefs, @"ircPort") intValue]
-                                                           useTLS:PrefOn(prefs, @"ircTLS") nickname:nick] autorelease];
-        irc.password = [cfg objectForKey:@"ircPassword"];
-        irc.channels = OCListFromString(PrefString(prefs, @"ircChannels"));
-        [_channelManager registerChannel:irc];
-    }
-    NSString *callback = PrefString(prefs, @"webhookCallbackURL");
-    if (PrefOn(prefs, @"webhookEnabled") && [callback length]) {
-        [_channelManager registerChannel:[[[OCWebhookChannel alloc] initWithCallbackURL:callback
-                                                                            bearerToken:[cfg objectForKey:@"webhookCallbackToken"]] autorelease]];
-    }
-    for (id<OCChannel> ch in [_pluginManager allPluginChannels]) {
-        if (![_channelManager registerChannel:ch]) NSLog(@"[LegacyPodClaw] plugin channel %@ clashes with another channel", [ch channelId]);
-    }
-    [_channelManager startAll];
-    NSLog(@"[LegacyPodClaw] %lu channels configured", (unsigned long)[[_channelManager channels] count]);
+    if (restarted) NSLog(@"[LegacyPodClaw] %lu channels reloaded, %lu configured", (unsigned long)restarted,
+                         (unsigned long)[[_channelManager channels] count]);
 }
 
 - (void)_autoStart {

@@ -10,7 +10,7 @@ weight: 1
 - [MobileSubstrate](http://cydia.saurik.com/package/mobilesubstrate/) (Cydia Substrate)
 - [PreferenceLoader](http://cydia.saurik.com/package/preferenceloader/)
 
-Get the latest `.deb` from [GitHub Releases](https://github.com/wrxck/LegacyPodClaw/releases). The file name is `pro.matthesketh.legacypodclaw_0.4.1_iphoneos-arm.deb`.
+Get the latest `.deb` from [GitHub Releases](https://github.com/wrxck/LegacyPodClaw/releases). The file name is `pro.matthesketh.legacypodclaw_0.4.2_iphoneos-arm.deb`.
 
 ## SSH over USB (macOS or Linux)
 
@@ -24,7 +24,7 @@ sshpass -p 'alpine' scp \
   -o HostKeyAlgorithms=ssh-rsa \
   -o KexAlgorithms=diffie-hellman-group14-sha1 \
   -P 2222 \
-  pro.matthesketh.legacypodclaw_0.4.1_iphoneos-arm.deb \
+  pro.matthesketh.legacypodclaw_0.4.2_iphoneos-arm.deb \
   root@127.0.0.1:/tmp/legacypodclaw.deb
 
 sshpass -p 'alpine' ssh \
@@ -40,7 +40,7 @@ Find the device IP address in **Settings > Wi-Fi > (i)**. Then run:
 
 ```bash
 scp -o HostKeyAlgorithms=ssh-rsa \
-  pro.matthesketh.legacypodclaw_0.4.1_iphoneos-arm.deb \
+  pro.matthesketh.legacypodclaw_0.4.2_iphoneos-arm.deb \
   root@DEVICE_IP:/tmp/legacypodclaw.deb
 
 ssh -o HostKeyAlgorithms=ssh-rsa root@DEVICE_IP \

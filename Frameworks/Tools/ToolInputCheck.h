@@ -28,6 +28,9 @@ NSString *OCToolApprovalText(NSDictionary *input, BOOL *tooLong);
 /* every other input field as alert text, made visible and cut with a note when long */
 NSString *OCToolOtherInputText(NSDictionary *rest);
 
+/* the whole approval alert text: intro, key fields, other input and reason, with no empty line inside the input */
+NSString *OCToolApprovalMessage(NSString *intro, NSString *keyText, NSString *otherText, NSString *reason);
+
 /* yes when the calculate tool may give the text to nsexpression */
 BOOL OCMathExpressionIsSafe(NSString *expression);
 

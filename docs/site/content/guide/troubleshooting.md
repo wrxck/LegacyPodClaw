@@ -67,7 +67,11 @@ The app checks its memory use every 5 seconds. Above 60 % of the budget, it trim
 
 ## A chat channel does not answer
 
-1. Open the channel screen and look at the **Status** row.
+1. Open the channel screen and look at the **Status** row. The full error shows below the row.
+   - **Stopped** with "refused the bot token" or "refused the app token": enter the correct token. The channel starts again.
+   - **Stopped** with Discord code 4014: turn on the **Message Content** intent in the Discord Developer Portal, then turn the channel off and on.
+   - **Retrying**: the network or the service failed. The channel tries again.
+   - "Telegram refused the poll (HTTP 409)": another program polls the same bot, or the bot has a webhook. Stop the other program or delete the webhook.
 2. Make sure that your ID is in the allow list. An empty list ignores everyone.
 3. Make sure that the app runs. The channels stop when iOS suspends the app.
 4. In a Discord or Slack channel, mention the bot. In an IRC channel, start the line with the bot's nick.

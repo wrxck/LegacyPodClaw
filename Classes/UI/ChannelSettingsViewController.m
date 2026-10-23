@@ -3,6 +3,7 @@
 #import "ChannelSettingsViewController.h"
 #import "AppDelegate.h"
 #import "SecretStore.h"
+#import "ChannelManager.h"
 #import <sys/stat.h>
 #import <notify.h>
 
@@ -75,16 +76,28 @@ static NSDictionary *Field(NSString *label, NSString *key, NSString *type, NSStr
     return [NSString stringWithFormat:@"%@\n\n%@", [notes objectForKey:cid] ?: @"", common];
 }
 
++ (NSString *)stateTextForChannel:(NSString *)cid {
+    NSDictionary *status = [[[AppDelegate shared].channelManager allChannelStatus] objectForKey:cid];
+    if (!status) return @"Off";
+    if ([[status objectForKey:@"connected"] boolValue]) return @"Connected";
+    if ([[status objectForKey:@"state"] isEqual:@"stopped"]) return @"Stopped";
+    return [[status objectForKey:@"lastError"] length] ? @"Retrying" : @"Connecting…";
+}
+
 - (id)initWithTitle:(NSString *)title fields:(NSArray *)fields footer:(NSString *)footer {
     if ((self = [super initWithStyle:UITableViewStyleGrouped])) {
         self.title = title;
         _fields = [fields copy];
         _footer = [footer copy];
+        /* the channel changes state long after the setting that caused it, so the status row must follow it */
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_channelStatusChanged:)
+                                                     name:OCChannelStatusDidChangeNotification object:nil];
     }
     return self;
 }
 
 - (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_fields release]; [_footer release]; [_editingKey release];
     [super dealloc];
 }
@@ -118,6 +131,16 @@ static NSDictionary *Field(NSString *label, NSString *key, NSString *type, NSStr
     return [s length] ? s : @"Not set";
 }
 
+- (NSString *)_channelId {
+    /* the first field is always the channel's enable switch, named after the channel id */
+    return [[[_fields objectAtIndex:0] objectForKey:@"key"] stringByReplacingOccurrencesOfString:@"Enabled" withString:@""];
+}
+
+- (void)_channelStatusChanged:(NSNotification *)note {
+    if (![self isViewLoaded] || ![[note object] isEqual:[self _channelId]]) return;
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:1] withRowAnimation:UITableViewRowAnimationNone];
+}
+
 #pragma mark - Table
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 2; }
@@ -126,21 +149,24 @@ static NSDictionary *Field(NSString *label, NSString *key, NSString *type, NSStr
     return section == 0 ? (NSInteger)[_fields count] : 1;
 }
 
+- (NSDictionary *)_status {
+    return [[[AppDelegate shared].channelManager allChannelStatus] objectForKey:[self _channelId]];
+}
+
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return section == 0 ? _footer : nil;
+    if (section == 0) return _footer;
+    /* a footer wraps, so a long error such as discord's intent advice can be read in full */
+    NSString *err = [[self _status] objectForKey:@"lastError"];
+    return [err isKindOfClass:[NSString class]] && [err length] ? err : nil;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil] autorelease];
     if (indexPath.section == 1) {
-        /* the first field is always the channel's enable switch, named after the channel id */
-        NSString *cid = [[[_fields objectAtIndex:0] objectForKey:@"key"] stringByReplacingOccurrencesOfString:@"Enabled" withString:@""];
-        NSDictionary *status = [[[AppDelegate shared].channelManager allChannelStatus] objectForKey:cid];
         cell.textLabel.text = @"Status";
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        NSString *err = [status objectForKey:@"lastError"];
-        cell.detailTextLabel.text = !status ? @"Off" : [[status objectForKey:@"connected"] boolValue] ? @"Connected"
-                                  : [err length] ? err : @"Connecting…";
+        /* the full error is in the footer below the row */
+        cell.detailTextLabel.text = [OCChannelSettingsViewController stateTextForChannel:[self _channelId]];
         return cell;
     }
     NSDictionary *field = [_fields objectAtIndex:indexPath.row];

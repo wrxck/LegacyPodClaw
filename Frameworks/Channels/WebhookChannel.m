@@ -33,8 +33,8 @@ static const NSUInteger kWebhookMaxText = 8000;
     NSString *scheme = [[[NSURL URLWithString:_callbackURL] scheme] lowercaseString];
     return [scheme isEqualToString:@"https"] || [scheme isEqualToString:@"http"];
 }
-- (void)start { _running = [self isConfigured]; }
-- (void)stop { _running = NO; }
+- (void)start { _running = [self isConfigured]; OCChannelStatusChanged(self); }
+- (void)stop { _running = NO; OCChannelStatusChanged(self); }
 
 static NSString *StringField(NSDictionary *d, NSString *key) {
     id v = [d objectForKey:key];
@@ -72,7 +72,10 @@ static NSString *StringField(NSDictionary *d, NSString *key) {
 }
 
 - (NSDictionary *)statusInfo {
-    return @{@"callback": [[NSURL URLWithString:_callbackURL] host] ?: @""};
+    /* a callback url that is not http or https never starts, so say so instead of connecting for ever */
+    if (![self isConfigured])
+        return @{@"callback": @"", @"state": @"stopped", @"lastError": @"The callback URL must start with http:// or https://."};
+    return @{@"callback": [[NSURL URLWithString:_callbackURL] host] ?: @"", @"state": _running ? @"connected" : @"stopped"};
 }
 
 @end

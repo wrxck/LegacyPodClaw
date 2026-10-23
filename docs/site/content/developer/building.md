@@ -31,7 +31,7 @@ make clean
 make package FINALPACKAGE=1
 ```
 
-The package is `packages/pro.matthesketh.legacypodclaw_0.4.1_iphoneos-arm.deb`. It holds the app, the tweak, the Settings bundle, the Notification Center widget and `clawpodd`.
+The package is `packages/pro.matthesketh.legacypodclaw_0.4.2_iphoneos-arm.deb`. It holds the app, the tweak, the Settings bundle, the Notification Center widget and `clawpodd`.
 
 ## Test
 

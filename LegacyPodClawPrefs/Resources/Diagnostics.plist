@@ -41,7 +41,7 @@
 			<key>label</key>
 			<string>Version</string>
 			<key>default</key>
-			<string>0.4.1</string>
+			<string>0.4.2</string>
 		</dict>
 		<dict>
 			<key>cell</key>

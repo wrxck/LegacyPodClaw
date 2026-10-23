@@ -18,7 +18,9 @@
 /* senders or chats that may talk to the bot; an empty list ignores every message on that channel */
 - (void)setAllowedSenders:(NSArray *)senders forChannel:(NSString *)channelId;
 
-/* stops every run and forgets every chat */
+/* aborts every run, drops its reply and queued messages, and forgets every chat */
 - (void)reset;
+/* the same for one channel; a tool call the user already approved still runs, but its result is dropped */
+- (void)resetChannel:(NSString *)channelId;
 
 @end

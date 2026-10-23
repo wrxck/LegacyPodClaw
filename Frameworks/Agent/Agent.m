@@ -126,7 +126,7 @@ static const NSUInteger kDefaultMaxResponse = 1024;
 
 - (void)connect:(void(^)(BOOL, NSError *))callback {
     NSDictionary *params = @{@"protocolVersion": @"2024-11-05", @"capabilities": @{},
-                             @"clientInfo": @{@"name": @"LegacyPodClaw", @"version": @"0.4.1"}};
+                             @"clientInfo": @{@"name": @"LegacyPodClaw", @"version": @"0.4.2"}};
     [self _rpc:@"initialize" params:params rpcId:1 completion:^(NSDictionary *result, NSError *error) {
         if (error) {
             if (callback) callback(NO, error);

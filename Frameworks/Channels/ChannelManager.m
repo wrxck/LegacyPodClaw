@@ -2,6 +2,16 @@
 
 #import "ChannelManager.h"
 
+NSString *const OCChannelStatusDidChangeNotification = @"OCChannelStatusDidChangeNotification";
+
+void OCChannelStatusChanged(id<OCChannel> channel) {
+    NSString *cid = [[[channel channelId] copy] autorelease];
+    /* async, so an observer never runs inside the channel's own state change */
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:OCChannelStatusDidChangeNotification object:cid];
+    });
+}
+
 @implementation OCChannelMessage
 
 - (instancetype)init {
@@ -43,6 +53,7 @@
     if ([cid length] == 0 || [_channelMap objectForKey:cid]) return NO;
     channel.messageDelegate = self;
     [_channelMap setObject:channel forKey:cid];
+    OCChannelStatusChanged(channel);
     return YES;
 }
 
@@ -51,6 +62,7 @@
     if (!ch) return;
     [ch stop];
     ch.messageDelegate = nil;
+    OCChannelStatusChanged(ch);
     [_channelMap removeObjectForKey:channelId];
 }
 

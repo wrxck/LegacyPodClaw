@@ -2,10 +2,13 @@
 
 #import "TelegramChannel.h"
 #import "TLSClient.h"
+#import "SharedFiles.h"
 
 static NSString *const kTelegramAPI = @"https://api.telegram.org/bot";
 static const int kPollTimeout = 25;
 static const NSUInteger kTelegramMaxChars = 4000;
+/* the last confirmed update id, so a restart does not fetch and answer an update again */
+static NSString *const kTelegramStateFile = @"telegram.plist";
 /* updates queued while the app was closed are stale; answering them hours later confuses people */
 static const NSTimeInterval kMaxMessageAge = 600;
 
@@ -13,12 +16,27 @@ static const NSTimeInterval kMaxMessageAge = 600;
     NSString *_botToken;
     BOOL _running;
     BOOL _connected;
+    BOOL _quickPoll;
+    BOOL _shownConnected;
     long long _lastUpdateId;
     NSUInteger _pollGeneration;
     NSTimeInterval _backoff;
     NSString *_lastError;
 }
 @end
+
+/* plain words for the status row; the http code stays so a search finds the cause */
+static NSString *TelegramErrorText(NSInteger status, id json) {
+    id desc = [json isKindOfClass:[NSDictionary class]] ? [json objectForKey:@"description"] : nil;
+    NSString *detail = [desc isKindOfClass:[NSString class]] && [desc length] ? [NSString stringWithFormat:@": %@", desc] : @"";
+    switch (status) {
+        case 401: return @"Telegram refused the bot token (HTTP 401). Check the Bot Token in Settings.";
+        case 404: return @"Telegram does not know this bot token (HTTP 404). Check the Bot Token in Settings.";
+        case 409: return [NSString stringWithFormat:@"Telegram refused the poll (HTTP 409)%@. "
+                          @"Another client or a webhook uses this bot.", detail];
+    }
+    return [NSString stringWithFormat:@"Telegram sent an error (HTTP %ld)%@", (long)status, detail];
+}
 
 @implementation OCTelegramChannel
 
@@ -27,8 +45,22 @@ static const NSTimeInterval kMaxMessageAge = 600;
 - (instancetype)initWithBotToken:(NSString *)token {
     if ((self = [super init])) {
         _botToken = [token copy];
+        /* the bot id is the public part of the token; an offset from another bot would skip this bot's updates */
+        NSDictionary *state = [NSDictionary dictionaryWithContentsOfFile:CPSharedPath(kTelegramStateFile)];
+        if ([[state objectForKey:@"bot"] isEqual:[self _botId]])
+            _lastUpdateId = [[state objectForKey:@"lastUpdateId"] longLongValue];
     }
     return self;
+}
+
+- (NSString *)_botId {
+    NSRange colon = [_botToken rangeOfString:@":"];
+    return colon.location == NSNotFound ? @"" : [_botToken substringToIndex:colon.location];
+}
+
+- (void)_saveOffset {
+    if (!CPWriteSharedPlist(kTelegramStateFile, @{@"bot": [self _botId], @"lastUpdateId": @(_lastUpdateId)}))
+        NSLog(@"[Telegram] could not save the update offset");
 }
 
 - (void)dealloc {
@@ -44,7 +76,11 @@ static const NSTimeInterval kMaxMessageAge = 600;
     if (_running || ![self isConfigured]) return;
     _running = YES;
     _backoff = 0;
+    /* a long poll can take 25 s to answer, so the first call returns at once to show the link works */
+    _quickPoll = YES;
+    _shownConnected = NO;
     _pollGeneration++;
+    OCChannelStatusChanged(self);
     [self _poll];
 }
 
@@ -52,18 +88,23 @@ static const NSTimeInterval kMaxMessageAge = 600;
     _running = NO;
     _connected = NO;
     _pollGeneration++;
+    OCChannelStatusChanged(self);
 }
 
 - (void)_setError:(NSString *)error {
+    /* each poll clears the error, so post only a real change or every visible table reloads every 25 s */
+    BOOL changed = !(error == _lastError || [error isEqualToString:_lastError]) || _connected != _shownConnected;
     [_lastError release];
     _lastError = [error copy];
+    _shownConnected = _connected;
+    if (changed) OCChannelStatusChanged(self);
 }
 
 - (void)_poll {
     if (!_running) return;
     NSUInteger gen = _pollGeneration;
     NSString *url = [NSString stringWithFormat:@"%@%@/getUpdates?timeout=%d&offset=%lld&allowed_updates=%%5B%%22message%%22%%5D",
-                     kTelegramAPI, _botToken, kPollTimeout, _lastUpdateId + 1];
+                     kTelegramAPI, _botToken, _quickPoll ? 0 : kPollTimeout, _lastUpdateId + 1];
     [CPTLSClient request:url method:@"GET" headers:nil body:nil
               completion:^(NSData *data, NSInteger status, NSError *error) {
         if (gen != _pollGeneration || !_running) return;
@@ -71,7 +112,7 @@ static const NSTimeInterval kMaxMessageAge = 600;
         BOOL ok = !error && status == 200 && [json isKindOfClass:[NSDictionary class]] && [[json objectForKey:@"ok"] boolValue];
         if (!ok) {
             _connected = NO;
-            [self _setError:error ? [error localizedDescription] : [NSString stringWithFormat:@"HTTP %ld", (long)status]];
+            [self _setError:error ? [error localizedDescription] : TelegramErrorText(status, json)];
             if (status == 401 || status == 404) {
                 /* the token is wrong; polling again would only repeat the failure */
                 NSLog(@"[Telegram] the bot token was rejected, stopping");
@@ -79,13 +120,17 @@ static const NSTimeInterval kMaxMessageAge = 600;
                 return;
             }
             _backoff = MIN(MAX(_backoff * 2, 5.0), 120.0);
+            /* a quick first poll shows the link as connected again without a full long poll wait */
+            _quickPoll = YES;
             [self _pollAfter:_backoff];
             return;
         }
         _connected = YES;
+        _quickPoll = NO;
         _backoff = 0;
         [self _setError:nil];
         NSArray *updates = [json objectForKey:@"result"];
+        long long before = _lastUpdateId;
         if ([updates isKindOfClass:[NSArray class]]) {
             for (NSDictionary *update in updates) {
                 if (![update isKindOfClass:[NSDictionary class]]) continue;
@@ -95,6 +140,7 @@ static const NSTimeInterval kMaxMessageAge = 600;
                 if ([msg isKindOfClass:[NSDictionary class]]) [self _processMessage:msg];
             }
         }
+        if (_lastUpdateId != before) [self _saveOffset];
         [self _pollAfter:0.2];
     }];
 }
@@ -147,7 +193,7 @@ static const NSTimeInterval kMaxMessageAge = 600;
 }
 
 - (NSDictionary *)statusInfo {
-    return @{@"polling": @(_running), @"lastError": _lastError ?: @""};
+    return @{@"polling": @(_running), @"state": _running ? (_connected ? @"connected" : @"connecting") : @"stopped", @"lastError": _lastError ?: @""};
 }
 
 - (void)_apiCall:(NSString *)method body:(NSDictionary *)body done:(dispatch_block_t)done {

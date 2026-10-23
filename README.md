@@ -91,7 +91,7 @@ sshpass -p 'alpine' scp \
   -o HostKeyAlgorithms=ssh-rsa \
   -o KexAlgorithms=diffie-hellman-group14-sha1 \
   -P 2222 \
-  pro.matthesketh.legacypodclaw_0.4.1_iphoneos-arm.deb \
+  pro.matthesketh.legacypodclaw_0.4.2_iphoneos-arm.deb \
   root@127.0.0.1:/tmp/legacypodclaw.deb
 
 sshpass -p 'alpine' ssh \
@@ -109,7 +109,7 @@ Find the device IP address in **Settings > Wi-Fi > (i)**. Then run:
 
 ```bash
 scp -o HostKeyAlgorithms=ssh-rsa \
-  pro.matthesketh.legacypodclaw_0.4.1_iphoneos-arm.deb \
+  pro.matthesketh.legacypodclaw_0.4.2_iphoneos-arm.deb \
   root@DEVICE_IP:/tmp/legacypodclaw.deb
 
 ssh -o HostKeyAlgorithms=ssh-rsa root@DEVICE_IP \

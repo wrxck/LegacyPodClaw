@@ -627,7 +627,7 @@ static NSData *GWHTTPError(NSInteger status, NSString *text) {
     else if ([method isEqualToString:@"gateway.identity.get"]) {
         [self _sendOk:reqId payload:@{
             @"name": [[UIDevice currentDevice] name] ?: @"",
-            @"version": @"0.4.1",
+            @"version": @"0.4.2",
             @"platform": @"ios6-ipod4"
         } client:client];
     }
@@ -676,7 +676,7 @@ static NSData *GWHTTPError(NSInteger status, NSString *text) {
         @"type": @"hello-ok",
         @"protocol": @(kProtocolVersion),
         @"server": @{
-            @"version": @"0.4.1-ios6",
+            @"version": @"0.4.2-ios6",
             @"connId": client.connectionId
         },
         @"features": @{
@@ -1016,7 +1016,7 @@ static NSData *GWHTTPError(NSInteger status, NSString *text) {
     return @{
         @"ok": @YES,
         @"status": @"live",
-        @"version": @"0.4.1-ios6",
+        @"version": @"0.4.2-ios6",
         @"platform": @"ipod-touch-4",
         @"uptime": @([self uptime]),
         @"connectedClients": @([_clients count]),

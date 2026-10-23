@@ -8,7 +8,7 @@ disableKinds = ["taxonomy", "term"]
   description = "AI assistant for iOS 6 — native Objective-C port of OpenClaw for jailbroken devices"
   author = "Matt Hesketh"
   github = "https://github.com/wrxck/LegacyPodClaw"
-  version = "0.4.1"
+  version = "0.4.2"
   # update with the release; the home page shows it
   codeSize = "~22,400 LOC"
 

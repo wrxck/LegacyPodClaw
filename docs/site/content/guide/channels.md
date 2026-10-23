@@ -16,6 +16,22 @@ A chat channel lets you talk to the assistant from a chat service. LegacyPodClaw
 
 Set up each channel in the app: tap the gear button, then a channel under **Chat Channels**. Each channel screen has an **Enabled** switch, the channel fields and a **Status** row.
 
+## Status row
+
+The **Status** row changes when the channel changes. It shows one of these values:
+
+| Value | Meaning |
+|---|---|
+| **Off** | The channel is off, or a token or field is missing. |
+| **Connecting…** | The channel starts its connection. |
+| **Connected** | The service accepted the connection. |
+| **Retrying** | The connection failed. The channel tries again after a delay. |
+| **Stopped** | The service refused the token or the settings. The channel does not try again. |
+
+When the channel has an error, the full error text shows below the row. After you correct a token or a field, the channel starts again.
+
+A change to one channel restarts only that channel. The conversations on the other channels continue.
+
 ## How channels work
 
 - Each chat or thread gets its own conversation. The reply goes back to the same chat.
@@ -53,6 +69,10 @@ With **Start on Boot** on, the app starts the channels and the gateway server wh
 
 The bot ignores a message that is older than 10 minutes.
 
+The **Status** row shows **Connected** after the first call to Telegram, usually in less than a few seconds. If Telegram refuses the token, the row shows **Stopped** and "Telegram refused the bot token (HTTP 401)".
+
+The app keeps the ID of the last update in `/var/mobile/Library/LegacyPodClaw/telegram.plist`. After a restart, Telegram does not send the same update again. The file holds the bot ID, not the token.
+
 ## Discord
 
 1. Make a bot in the [Discord Developer Portal](https://discord.com/developers).
@@ -62,7 +82,7 @@ The bot ignores a message that is older than 10 minutes.
 5. Enter user or channel IDs in **Allowed IDs**.
 6. Turn on **Enabled**.
 
-In a server, the bot answers only when you mention it. If Discord closes the connection with a fatal code (4004 or 4010 to 4014), the channel stops and the **Status** row shows the reason.
+In a server, the bot answers only when you mention it. If Discord closes the connection with a fatal code (4004 or 4010 to 4014), the channel stops. The **Status** row shows **Stopped** and the full reason shows below the row. For example, code 4014 tells you to turn on the **Message Content** intent.
 
 ## Slack
 
@@ -75,6 +95,8 @@ In a server, the bot answers only when you mention it. If Discord closes the con
 7. Turn on **Enabled**.
 
 In a channel, the app answers only when you mention it. A long reply is sent in parts of at most 3,500 characters.
+
+If Slack refuses a token (for example `invalid_auth` or `not_allowed_token_type`), the channel stops. The **Status** row shows **Stopped** and, for example, "Slack refused the bot token (invalid_auth)". `not_allowed_token_type` usually means that the app token and the bot token are in the wrong fields.
 
 ## IRC
 

@@ -371,7 +371,8 @@ cleanup:
     }
 
     NSMutableDictionary *hdrs = [NSMutableDictionary dictionaryWithDictionary:headers ?: @{}];
-    [hdrs setObject:@"application/json" forKey:@"Content-Type"];
+    /* slack warns missing_charset without it */
+    [hdrs setObject:@"application/json; charset=utf-8" forKey:@"Content-Type"];
 
     [self request:urlString method:@"POST" headers:hdrs body:bodyData
        completion:^(NSData *data, NSInteger statusCode, NSError *error) {

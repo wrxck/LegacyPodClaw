@@ -70,4 +70,17 @@ void RunToolInputTests(void) {
     msg = [OCFileError(e, @"/etc/hosts") localizedDescription];
     CHECK([msg rangeOfString:@"Cocoa error"].location == NSNotFound && [msg hasSuffix:@"/etc/hosts"], @"file as folder plain: %@", msg);
     CHECK(OCFileError(nil, missing) == nil, @"no error stays nil");
+
+    BOOL longKey = NO;
+    NSString *keys = OCToolApprovalText(@{@"path": @"/tmp/a"}, &longKey);
+    NSString *alert = OCToolApprovalMessage(@"The chat wants to run \"write_file\".", keys,
+                                            OCToolOtherInputText(@{@"content": @"hi"}), nil);
+    CHECK([alert isEqualToString:@"The chat wants to run \"write_file\".\n\npath: /tmp/a\nOther input:\ncontent: hi"],
+          @"no empty line before other input: %@", alert);
+    CHECK([alert rangeOfString:@"\n\nOther input"].location == NSNotFound, @"other input follows the key fields");
+    alert = OCToolApprovalMessage(@"Run?", keys, nil, @"Guardrail: writes a file");
+    CHECK([alert isEqualToString:@"Run?\n\npath: /tmp/a\n\nGuardrail: writes a file"], @"reason after one empty line: %@", alert);
+    alert = OCToolApprovalMessage(@"Run?", @"", OCToolOtherInputText(@{@"x": @"1"}), nil);
+    CHECK([alert isEqualToString:@"Run?\n\nOther input:\nx: 1"], @"other input alone: %@", alert);
+    CHECK([OCToolApprovalMessage(@"Run?", nil, nil, nil) isEqualToString:@"Run?"], @"intro alone");
 }

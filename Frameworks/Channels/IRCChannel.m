@@ -67,6 +67,7 @@ static const NSTimeInterval kIRCLineInterval = 1.0;
 
 - (void)_teardown {
     _registered = NO;
+    OCChannelStatusChanged(self);
     [_sendTimer invalidate]; _sendTimer = nil;
     [_outQueue removeAllObjects];
     _conn.delegate = nil;
@@ -96,6 +97,7 @@ static const NSTimeInterval kIRCLineInterval = 1.0;
     [_lastError release];
     _lastError = [[error localizedDescription] copy];
     [self _teardown];
+    OCChannelStatusChanged(self);
     if (!_running) return;
     _backoff = MIN(MAX(_backoff * 2, 5.0), 300.0);
     NSUInteger gen = ++_generation;
@@ -154,6 +156,7 @@ static const NSTimeInterval kIRCLineInterval = 1.0;
         _registered = YES;
         _backoff = 0;
         [_lastError release]; _lastError = nil;
+        OCChannelStatusChanged(self);
         if ([parts count] > 1) { [_currentNick release]; _currentNick = [[parts objectAtIndex:1] copy]; }
         for (NSString *ch in _channels) {
             if ([ch hasPrefix:@"#"] || [ch hasPrefix:@"&"]) [self _sendNow:[NSString stringWithFormat:@"JOIN %@", ch]];
@@ -252,7 +255,8 @@ static const NSTimeInterval kIRCLineInterval = 1.0;
 }
 
 - (NSDictionary *)statusInfo {
-    return @{@"server": _server ?: @"", @"nick": _currentNick ?: @"", @"lastError": _lastError ?: @""};
+    return @{@"server": _server ?: @"", @"nick": _currentNick ?: @"",
+             @"state": _running ? (_registered ? @"connected" : @"connecting") : @"stopped", @"lastError": _lastError ?: @""};
 }
 
 @end

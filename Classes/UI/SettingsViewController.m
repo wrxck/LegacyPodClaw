@@ -9,6 +9,7 @@
 #import "SettingsViewController.h"
 #import "ChannelSettingsViewController.h"
 #import "AppDelegate.h"
+#import "ChannelManager.h"
 #import "SecretStore.h"
 #import "GatewayToken.h"
 #import "ProviderRegistry.h"
@@ -57,6 +58,16 @@ enum {
         initWithBarButtonSystemItem:UIBarButtonSystemItemDone
                              target:self
                              action:@selector(_done)] autorelease];
+    /* a channel connects or fails long after the setting that caused it, so its row must follow it */
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_channelStatusChanged:)
+                                                 name:OCChannelStatusDidChangeNotification object:nil];
+}
+
+- (void)_channelStatusChanged:(NSNotification *)note {
+    NSUInteger row = [[OCChannelSettingsViewController channelIds] indexOfObject:[note object]];
+    if (row == NSNotFound || ![self isViewLoaded]) return;
+    NSIndexPath *path = [NSIndexPath indexPathForRow:(NSInteger)row inSection:SettingsSectionChannels];
+    [self.tableView reloadRowsAtIndexPaths:@[path] withRowAnimation:UITableViewRowAnimationNone];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -105,6 +116,7 @@ enum {
 }
 
 - (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_prefs release];
     [_editingKey release];
     [super dealloc];
@@ -248,9 +260,7 @@ enum {
             if ((NSUInteger)indexPath.row < [ids count]) {
                 NSString *cid = [ids objectAtIndex:indexPath.row];
                 cell.textLabel.text = [OCChannelSettingsViewController titleForChannel:cid];
-                BOOL enabled = [self _prefBool:[cid stringByAppendingString:@"Enabled"]];
-                BOOL connected = [[[AppDelegate shared].channelManager channelForId:cid] isConnected];
-                cell.detailTextLabel.text = !enabled ? @"Off" : connected ? @"Connected" : @"On";
+                cell.detailTextLabel.text = [OCChannelSettingsViewController stateTextForChannel:cid];
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             } else if ((NSUInteger)indexPath.row == [ids count]) {
                 return [self _switchCell:@"Tools in Chats" on:[self _prefBool:@"channelToolsEnabled"] tag:kTagChannelTools];

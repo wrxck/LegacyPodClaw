@@ -30,6 +30,11 @@ static const NSString *kWebSocketGUID = @"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 static int32_t sActiveConnections = 0;
 
+/* rfc 6455 7.4: 1004-1006, 1015 and unassigned codes must not go on the wire, so answer them with 1002 */
+static uint16_t WSEchoCode(uint16_t c) {
+    return ((c >= 1000 && c <= 1003) || (c >= 1007 && c <= 1014) || (c >= 3000 && c <= 4999)) ? c : 1002;
+}
+
 /* Base64 encoder for iOS 6 (NSData base64EncodedStringWithOptions: is iOS 7+) */
 static NSString *OCBase64Encode(NSData *data) {
     static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -797,8 +802,16 @@ static NSString *NormalizedHex(NSString *s) {
             }
 
             if (!_sentClose) {
-                /* Echo close frame back */
-                [self closeWithCode:code reason:reason];
+                /* rfc 6455 5.5.1: echo the status code now; closeWithCode: is async and would run after the teardown below */
+                NSData *echo = [NSData data];
+                if ([payload length] >= 2) {
+                    const uint8_t *b = [payload bytes];
+                    uint16_t c = WSEchoCode((uint16_t)((b[0] << 8) | b[1]));
+                    uint8_t e[2] = { (uint8_t)(c >> 8), (uint8_t)(c & 0xFF) };
+                    echo = [NSData dataWithBytes:e length:2];
+                }
+                [self _sendFrameWithOpcode:OCWSOpcClose payload:echo];
+                _sentClose = YES;
             }
 
             [self _teardownWithCode:code reason:reason wasClean:YES];

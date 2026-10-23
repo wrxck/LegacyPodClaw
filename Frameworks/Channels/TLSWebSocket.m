@@ -7,6 +7,11 @@
 static NSString *const kWSGUID = @"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 static const NSUInteger kMaxHandshakeBytes = 16 * 1024;
 
+/* rfc 6455 7.4: 1004-1006, 1015 and unassigned codes must not go on the wire, so answer them with 1002 */
+static uint16_t WSEchoCode(uint16_t c) {
+    return ((c >= 1000 && c <= 1003) || (c >= 1007 && c <= 1014) || (c >= 3000 && c <= 4999)) ? c : 1002;
+}
+
 static NSString *WSBase64(NSData *data) {
     static const char t[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     const uint8_t *in = [data bytes];
@@ -76,7 +81,9 @@ static NSError *WSError(NSString *message) {
 
 - (void)close {
     if (_closed) return;
-    if (_handshakeDone) [self _sendFrame:0x8 payload:[NSData data]];
+    /* rfc 6455 5.5.1: a close frame carries a status code; 1000 is a normal close */
+    static const uint8_t normal[2] = { 0x03, 0xE8 };
+    if (_handshakeDone) [self _sendFrame:0x8 payload:[NSData dataWithBytes:normal length:2]];
     _closed = YES;
     _delegate = nil;
     [_conn close];
@@ -203,6 +210,15 @@ static NSError *WSError(NSString *message) {
         case 0x9: [self _sendFrame:0xA payload:payload]; return;
         case 0xA: return;
         case 0x8: {
+            /* rfc 6455 5.5.1: answer a close frame with a close frame that echoes its status code */
+            if ([payload length] >= 2) {
+                const uint8_t *b = [payload bytes];
+                uint16_t c = WSEchoCode((uint16_t)((b[0] << 8) | b[1]));
+                uint8_t echo[2] = { (uint8_t)(c >> 8), (uint8_t)(c & 0xFF) };
+                [self _sendFrame:0x8 payload:[NSData dataWithBytes:echo length:2]];
+            } else {
+                [self _sendFrame:0x8 payload:[NSData data]];
+            }
             /* the close code tells a fatal error (a bad token) from a request to reconnect */
             if ([payload length] < 2) { [self _failWith:WSError(@"Websocket closed by server")]; return; }
             const uint8_t *b = [payload bytes];

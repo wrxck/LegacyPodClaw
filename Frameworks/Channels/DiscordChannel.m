@@ -14,6 +14,7 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
     OCTLSWebSocket *_ws;
     BOOL _running, _connected, _awaitingAck;
     NSTimer *_heartbeatTimer;
+    NSTimeInterval _heartbeatInterval;
     NSInteger _lastSequence;
     NSString *_botUserId;
     NSString *_lastError;
@@ -55,6 +56,7 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
     _running = NO;
     _connectGeneration++;
     [self _teardown];
+    OCChannelStatusChanged(self);
 }
 
 - (void)_teardown {
@@ -78,6 +80,7 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
     [self _teardown];
     if (!_running) return;
     [_lastError release]; _lastError = [reason copy];
+    OCChannelStatusChanged(self);
     _backoff = MIN(MAX(_backoff * 2, 2.0), 120.0);
     NSUInteger gen = ++_connectGeneration;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(_backoff * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -103,6 +106,7 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
     if (fatal) {
         [self stop];
         [_lastError release]; _lastError = [fatal copy];
+        OCChannelStatusChanged(self);
         NSLog(@"[Discord] %@", fatal);
         return;
     }
@@ -122,9 +126,12 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
             NSTimeInterval interval = [hello isKindOfClass:[NSDictionary class]]
                 ? [[hello objectForKey:@"heartbeat_interval"] doubleValue] / 1000.0 : 0;
             if (interval < 1) interval = 41.25;
+            _heartbeatInterval = interval;
             [_heartbeatTimer invalidate];
-            _heartbeatTimer = [NSTimer scheduledTimerWithTimeInterval:interval target:self
-                                                             selector:@selector(_heartbeat) userInfo:nil repeats:YES];
+            /* discord asks for a random first delay, so many clients that reconnect at once do not beat together */
+            double jitter = arc4random_uniform(10001) / 10000.0;
+            _heartbeatTimer = [NSTimer scheduledTimerWithTimeInterval:interval * jitter target:self
+                                                             selector:@selector(_firstHeartbeat) userInfo:nil repeats:NO];
             [self _sendIdentify];
             break;
         }
@@ -141,6 +148,12 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
     if (!json) return;
     NSString *s = [[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] autorelease];
     [_ws sendText:s];
+}
+
+- (void)_firstHeartbeat {
+    _heartbeatTimer = [NSTimer scheduledTimerWithTimeInterval:_heartbeatInterval target:self
+                                                     selector:@selector(_heartbeat) userInfo:nil repeats:YES];
+    [self _heartbeat];
 }
 
 - (void)_heartbeat {
@@ -164,6 +177,7 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
         _connected = YES;
         _backoff = 0;
         [_lastError release]; _lastError = nil;
+        OCChannelStatusChanged(self);
         [_botUserId release];
         _botUserId = [[[[d objectForKey:@"user"] objectForKey:@"id"] description] copy];
     } else if ([event isEqualToString:@"MESSAGE_CREATE"]) {
@@ -205,7 +219,11 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
 #pragma mark - Sending
 
 - (NSDictionary *)_headers {
-    return @{@"Authorization": [@"Bot " stringByAppendingString:_botToken], @"User-Agent": @"DiscordBot (legacypodclaw, 0.3)"};
+    /* discord wants "DiscordBot (url, version)"; the bundle version keeps it current at each release */
+    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    if (![version isKindOfClass:[NSString class]] || [version length] == 0) version = @"0";
+    NSString *agent = [NSString stringWithFormat:@"DiscordBot (https://github.com/wrxck/LegacyPodClaw, %@)", version];
+    return @{@"Authorization": [@"Bot " stringByAppendingString:_botToken], @"User-Agent": agent};
 }
 
 - (void)sendMessage:(NSString *)text toChatId:(NSString *)chatId threadId:(NSString *)threadId {
@@ -229,7 +247,7 @@ static const NSUInteger kDiscordIntents = (1 << 0) | (1 << 9) | (1 << 12) | (1 <
 }
 
 - (NSDictionary *)statusInfo {
-    return @{@"botUserId": _botUserId ?: @"", @"lastError": _lastError ?: @""};
+    return @{@"botUserId": _botUserId ?: @"", @"state": _running ? (_connected ? @"connected" : @"connecting") : @"stopped", @"lastError": _lastError ?: @""};
 }
 
 @end

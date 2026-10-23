@@ -65,6 +65,11 @@
 
 @end
 
+/* posted on the main queue when a channel connects, fails, stops, or is added or removed; object is the channel id */
+extern NSString *const OCChannelStatusDidChangeNotification;
+/* a channel calls this after a change that its status row must show */
+void OCChannelStatusChanged(id<OCChannel> channel);
+
 /* removes markdown marks for platforms that show them literally */
 NSString *OCStripMarkdown(NSString *markdown);
 /* splits text into pieces no longer than the limit, preferring line breaks */
