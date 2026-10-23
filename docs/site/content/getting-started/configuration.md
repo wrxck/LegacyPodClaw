@@ -22,8 +22,16 @@ If you're running an [OpenClaw](https://openclaw.ai) gateway on your network:
 
 1. Go to **Settings > LegacyPodClaw > Gateway**
 2. Enter the gateway host and port
-3. Enter your auth token or password
+3. Enter the gateway's auth token or password
 4. Tap **Connect**
+
+If the gateway uses a self-signed certificate, turn on **Self-Signed Certs** and enter the certificate's SHA-256 fingerprint in **Cert SHA-256**. Get it on the gateway host:
+
+```
+openssl x509 -noout -fingerprint -sha256 -in cert.pem
+```
+
+Without the fingerprint, the app refuses the connection.
 
 ## Bonjour Auto-Discovery
 
@@ -46,4 +54,4 @@ LegacyPodClaw supports 10 AI providers. Each needs only an API key (or base URL 
 | Deepseek | API Key |
 | Custom | Base URL + API Key |
 
-Configure providers in **Settings > LegacyPodClaw > Local Agent**. The agent supports automatic failover between configured providers.
+Configure providers in **Settings > LegacyPodClaw > Local Agent**. There is no automatic failover between providers.
