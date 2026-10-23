@@ -1,0 +1,16 @@
+{{/* entries come from data/screenshots.yaml (list of src + caption); with none, three placeholders hold the space */}}
+{{ $shots := site.Data.screenshots | default slice }}
+<section class="group-section screenshot-strip-section">
+  <h2 class="group-header">Screenshots</h2>
+  <div class="screenshot-strip" tabindex="0" role="region" aria-label="Screenshots, scroll sideways">
+    {{ if $shots }}
+    {{ range $shots }}
+    {{ partial "device-frame.html" (dict "src" (.src | relURL) "alt" .caption "caption" .caption) }}
+    {{ end }}
+    {{ else }}
+    {{ range seq 3 }}
+    {{ partial "device-frame.html" (dict "src" "") }}
+    {{ end }}
+    {{ end }}
+  </div>
+</section>

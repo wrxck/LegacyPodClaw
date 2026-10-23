@@ -1,19 +1,29 @@
-<nav class="sidebar" id="sidebar">
-  {{ range .Site.Menus.main }}
-  <div class="sidebar-section">
-    <a href="{{ .URL }}" class="sidebar-link {{ if $.HasMenuCurrent "main" . }}sidebar-link--active{{ end }}">
-      {{ .Name }}
-    </a>
-    {{ if $.HasMenuCurrent "main" . }}
-    {{ $section := $.Site.GetPage .URL }}
-    {{ if $section }}
-    {{ range $section.Pages }}
-    <a href="{{ .Permalink }}" class="sidebar-sublink {{ if eq $.Permalink .Permalink }}sidebar-sublink--active{{ end }}">
-      {{ .Title }}
-    </a>
-    {{ end }}
-    {{ end }}
-    {{ end }}
+<nav class="sidebar pinstripe" id="sidebar" aria-label="Sections">
+  <div class="sheet-head">
+    <span class="sheet-title">Sections</span>
+    <button type="button" class="btn btn--bar" data-sheet-close>Done</button>
   </div>
+  {{ range .Site.Menus.main }}
+  {{ $active := hasPrefix $.RelPermalink (.URL | relURL) }}
+  <ul class="group">
+    <li>
+      <a href="{{ .URL | relURL }}" class="cell{{ if $active }} cell--section{{ end }}"{{ if eq $.RelPermalink (.URL | relURL) }} aria-current="page"{{ end }}>
+        <span class="cell-title">{{ .Name }}</span>
+        <span class="chevron" aria-hidden="true"></span>
+      </a>
+    </li>
+    {{ if $active }}
+    {{ with $.Site.GetPage .URL }}
+    {{ range .Pages.ByWeight }}
+    <li>
+      <a href="{{ .RelPermalink }}" class="cell cell--sub"{{ if eq $.RelPermalink .RelPermalink }} aria-current="page"{{ end }}>
+        <span class="cell-detail">{{ .Title }}</span>
+        <span class="chevron" aria-hidden="true"></span>
+      </a>
+    </li>
+    {{ end }}
+    {{ end }}
+    {{ end }}
+  </ul>
   {{ end }}
 </nav>

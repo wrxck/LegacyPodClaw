@@ -1,0 +1,15 @@
+{{/* split rendered html at each h2 so every section becomes a grouped-table card with its header above it */}}
+{{ $parts := split (string .) "<h2" }}
+{{ $intro := index $parts 0 }}
+{{ if trim $intro " \n\t" }}
+<div class="card prose">{{ $intro | safeHTML }}</div>
+{{ end }}
+{{ range after 1 $parts }}
+{{ $bits := split . "</h2>" }}
+{{ $head := index $bits 0 }}
+{{ $body := delimit (after 1 $bits) "</h2>" }}
+<section class="group-section">
+  {{ printf "<h2 class=\"group-header\"%s</h2>" $head | safeHTML }}
+  {{ if trim $body " \n\t" }}<div class="card prose">{{ $body | safeHTML }}</div>{{ end }}
+</section>
+{{ end }}

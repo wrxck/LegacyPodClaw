@@ -1,0 +1,10 @@
+{{/* "> [!WARNING]" style alerts become alert views; plain quotes stay quotes */}}
+{{ if eq .Type "alert" }}
+{{ $type := lower .AlertType }}
+<aside class="alert alert--{{ $type }}" aria-label="{{ title $type }}">
+  <p class="alert-title">{{ with .AlertTitle }}{{ . }}{{ else }}{{ title $type }}{{ end }}</p>
+  <div class="alert-body">{{ .Text }}</div>
+</aside>
+{{ else }}
+<blockquote>{{ .Text }}</blockquote>
+{{ end }}

@@ -1,9 +1,9 @@
 {{ define "main" }}
-<div style="text-align: center; padding: 60px 24px;">
-  <h1 style="font-size: 48px; color: #999; margin-bottom: 8px;">404</h1>
-  <p style="font-size: 16px; color: #666; margin-bottom: 24px;">This page doesn't exist.</p>
-  <a href="/" class="nav-cell" style="display: inline-flex; border-radius: 8px; border: 1px solid #c8c8cc; padding: 12px 24px;">
-    <span class="nav-cell-title">Back to Home</span>
-  </a>
+<div class="alert" role="alert">
+  <p class="alert-title">Page Not Found</p>
+  <p>This page does not exist. It may have moved.</p>
+  <div class="alert-buttons">
+    <a class="btn btn--alert" href="{{ "/" | relURL }}">Go Home</a>
+  </div>
 </div>
 {{ end }}

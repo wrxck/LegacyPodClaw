@@ -1,22 +1,60 @@
 {{ define "main" }}
-<div class="landing-hero">
-  <h1>{{ .Site.Title }}</h1>
-  <p>{{ .Site.Params.description }}</p>
-  <div class="badge-row">
-    <span class="badge badge--ios">iOS 6</span>
-    <span class="badge badge--arch">ARMv7</span>
-    <span class="badge badge--lang">Objective-C</span>
-    <span class="badge badge--loc">~19,700 LOC</span>
+{{ $icons := dict "/getting-started/" "start" "/guide/" "guide" "/developer/" "developer" "/devices/" "devices" "/changelog/" "changelog" "/about/" "about" }}
+{{ $dock := slice
+  (dict "url" ("/getting-started/install/" | relURL) "name" "Install" "icon" "install")
+  (dict "url" ("/guide/tools/" | relURL) "name" "Tools" "icon" "tools")
+  (dict "url" ("/guide/troubleshooting/" | relURL) "name" "Help" "icon" "help")
+  (dict "url" .Site.Params.github "name" "Source" "icon" "source")
+}}
+<div class="springboard">
+  <header class="sb-hero">
+    <h1>{{ .Site.Title }}</h1>
+    <p>{{ .Site.Params.description }}</p>
+  </header>
+
+  <nav aria-label="Sections">
+    <ul class="icon-grid">
+      {{ range .Site.Menus.main }}
+      {{ partial "app-icon.html" (dict "url" (.URL | relURL) "name" .Name "icon" (index $icons .URL | default "about")) }}
+      {{ end }}
+    </ul>
+  </nav>
+
+  <div class="page-dots" aria-hidden="true"><i class="on"></i><i></i></div>
+
+  <nav class="dock" aria-label="Quick links">
+    <ul class="icon-grid icon-grid--dock">
+      {{ range $dock }}{{ partial "app-icon.html" . }}{{ end }}
+    </ul>
+  </nav>
+</div>
+
+<div class="pinstripe home-body">
+  <div class="home-columns">
+    <div>
+      <section class="group-section">
+        <h2 class="group-header">Overview</h2>
+        <div class="card prose">{{ .Content }}</div>
+      </section>
+
+      <div class="button-row">
+        <a class="btn btn--blue btn--large" href="{{ "/getting-started/" | relURL }}">Get Started</a>
+        <a class="btn btn--large" href="{{ .Site.Params.github }}">View Source</a>
+      </div>
+    </div>
+
+    <section class="group-section">
+      <h2 class="group-header">Requirements</h2>
+      <ul class="group">
+        <li class="cell cell--static"><span class="cell-title">Platform</span><span class="cell-value">iOS 6</span></li>
+        <li class="cell cell--static"><span class="cell-title">Architecture</span><span class="cell-value">ARMv7</span></li>
+        <li class="cell cell--static"><span class="cell-title">Language</span><span class="cell-value">Objective-C</span></li>
+        <li class="cell cell--static"><span class="cell-title">Code size</span><span class="cell-value">~19,700 LOC</span></li>
+        <li class="cell cell--static"><span class="cell-title">Jailbreak</span>{{ partial "switch.html" (dict "on" true "label" "Jailbreak required") }}</li>
+      </ul>
+    </section>
   </div>
-</div>
 
-<div class="nav-cells" style="margin: 0 24px 24px;">
-  {{ range .Site.Menus.main }}
-  {{ partial "nav-cell.html" (dict "url" .URL "title" .Name "description" "") }}
-  {{ end }}
-</div>
-
-<div style="padding: 0 24px 24px;">
-  {{ .Content }}
+  {{ partial "screenshot-strip.html" . }}
 </div>
 {{ end }}

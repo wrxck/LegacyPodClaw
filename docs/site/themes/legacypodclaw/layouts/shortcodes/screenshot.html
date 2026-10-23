@@ -1,0 +1,16 @@
+{{/* usage: {{< screenshot src="img/screens/chat.png" caption="The chat view" >}}; src is a page resource or a path under static */}}
+{{ $src := .Get "src" | default "" }}
+{{ $caption := .Get "caption" | default "" }}
+{{ $alt := .Get "alt" | default $caption }}
+{{ $w := .Get "width" | default 640 }}
+{{ $h := .Get "height" | default 960 }}
+{{ with $src }}
+  {{ with $.Page.Resources.Get . }}
+    {{ $src = .RelPermalink }}
+    {{ if eq .MediaType.MainType "image" }}{{ if ne .MediaType.SubType "svg" }}{{ $w = .Width }}{{ $h = .Height }}{{ end }}{{ end }}
+  {{ else }}
+    {{ $src = . | relURL }}
+  {{ end }}
+{{ end }}
+{{ if and $src (not $alt) }}{{ errorf "screenshot shortcode in %s needs a caption or alt" .Page.File.Path }}{{ end }}
+{{ partial "device-frame.html" (dict "src" $src "alt" $alt "caption" $caption "width" $w "height" $h) }}

@@ -3,27 +3,28 @@
 <head>
   {{ partial "head.html" . }}
 </head>
-<body>
-  <div class="linen-bg">
-    <div class="container">
+<body class="{{ if .IsHome }}is-home{{ else }}has-tabbar{{ end }}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="linen">
+    <div class="screen">
+      {{ partial "statusbar.html" . }}
+      {{ if .IsHome }}
+      <main id="main" class="home" tabindex="-1">
+        {{ block "main" . }}{{ end }}
+      </main>
+      {{ else }}
       {{ partial "header.html" . }}
-      <div class="content-wrapper">
-        {{ if and (not .IsHome) (gt (len .Site.Menus.main) 0) }}
-        <div class="layout-with-sidebar">
-          {{ partial "sidebar.html" . }}
-          <main class="content-area">
-            {{ block "main" . }}{{ end }}
-          </main>
-        </div>
-        {{ else }}
-        <main class="content-area content-area--full">
+      <div class="layout">
+        {{ partial "sidebar.html" . }}
+        <main id="main" class="pinstripe content" tabindex="-1">
           {{ block "main" . }}{{ end }}
         </main>
-        {{ end }}
       </div>
-      {{ partial "footer.html" . }}
+      {{ end }}
     </div>
+    {{ partial "footer.html" . }}
   </div>
+  {{ if not .IsHome }}{{ partial "tabbar.html" . }}{{ end }}
   <script src="{{ "js/main.js" | relURL }}"></script>
 </body>
 </html>

@@ -1,14 +1,10 @@
-{{ $url := .url }}
-{{ $title := .title }}
 {{ $description := .description | default "" }}
-<a href="{{ $url }}" class="nav-cell">
-  <div class="nav-cell-content">
-    <span class="nav-cell-title">{{ $title }}</span>
-    {{ if $description }}
-    <span class="nav-cell-desc">{{ $description }}</span>
-    {{ end }}
-  </div>
-  <svg class="nav-cell-arrow" viewBox="0 0 8 14" width="8" height="14">
-    <path d="M1 1l6 6-6 6" stroke="#999" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-</a>
+<li>
+  <a href="{{ .url }}" class="cell">
+    <span class="cell-body">
+      <span class="cell-title">{{ .title }}</span>
+      {{ with $description }}<span class="cell-detail">{{ . }}</span>{{ end }}
+    </span>
+    <span class="chevron" aria-hidden="true"></span>
+  </a>
+</li>

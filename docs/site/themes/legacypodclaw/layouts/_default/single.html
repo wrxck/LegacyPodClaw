@@ -1,14 +1,15 @@
 {{ define "main" }}
-<article>
-  {{ .Content }}
+<article class="article">
+  {{ partial "grouped-content.html" .Content }}
 </article>
 
-{{ if .PrevInSection }}
-<nav class="page-nav">
-  <a href="{{ .PrevInSection.Permalink }}">&larr; {{ .PrevInSection.Title }}</a>
-  {{ if .NextInSection }}
-  <a href="{{ .NextInSection.Permalink }}">{{ .NextInSection.Title }} &rarr;</a>
-  {{ end }}
+{{/* hugo's next/prev run against weight order, so swap them to read in weight order */}}
+{{ $prev := .NextInSection }}
+{{ $next := .PrevInSection }}
+{{ if or $prev $next }}
+<nav class="segmented segmented--pager" aria-label="More in this section">
+  {{ with $prev }}<a class="segment" href="{{ .RelPermalink }}"><span aria-hidden="true">&lsaquo;</span> {{ .Title }}</a>{{ end }}
+  {{ with $next }}<a class="segment" href="{{ .RelPermalink }}">{{ .Title }} <span aria-hidden="true">&rsaquo;</span></a>{{ end }}
 </nav>
 {{ end }}
 {{ end }}

@@ -1,22 +1,7 @@
+{{ $parent := .Parent }}
 <header class="navbar">
-  {{ if not .IsHome }}
-  <a class="navbar-back" href="{{ if .Parent }}{{ .Parent.Permalink }}{{ else }}/{{ end }}">
-    <svg class="back-arrow" viewBox="0 0 12 20" width="12" height="20">
-      <path d="M10 2L2 10l8 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span class="back-label">{{ if .Parent }}{{ .Parent.Title }}{{ else }}Home{{ end }}</span>
+  <a class="navbar-back" href="{{ with $parent }}{{ .RelPermalink }}{{ else }}{{ "/" | relURL }}{{ end }}">
+    <span class="navbar-back-label">{{ with $parent }}{{ if .IsHome }}Home{{ else }}{{ .Title }}{{ end }}{{ else }}Home{{ end }}</span>
   </a>
-  {{ end }}
-  <h1 class="navbar-title">
-    {{ if .IsHome }}{{ .Site.Title }}{{ else }}{{ .Title }}{{ end }}
-  </h1>
-  {{ if not .IsHome }}
-  <button class="sidebar-toggle" aria-label="Toggle navigation">
-    <svg viewBox="0 0 20 20" width="20" height="20">
-      <rect y="2" width="20" height="2" rx="1" fill="#fff"/>
-      <rect y="9" width="20" height="2" rx="1" fill="#fff"/>
-      <rect y="16" width="20" height="2" rx="1" fill="#fff"/>
-    </svg>
-  </button>
-  {{ end }}
+  <h1 class="navbar-title">{{ .Title }}</h1>
 </header>

@@ -12,6 +12,7 @@ theme = "legacypodclaw"
 [markup]
   [markup.highlight]
     style = "monokai"
+    noClasses = false
     lineNos = false
     guessSyntax = true
   [markup.goldmark]

@@ -1,0 +1,6 @@
+{{/* a read-only switch: it shows a state, it is not a form control */}}
+{{ $on := .on | default false }}
+<span class="switch{{ if $on }} switch--on{{ end }}" role="img" aria-label="{{ .label | default "Setting" }}: {{ if $on }}on{{ else }}off{{ end }}">
+  <span class="switch-track" aria-hidden="true"><span class="switch-text">{{ if $on }}ON{{ else }}OFF{{ end }}</span></span>
+  <span class="switch-knob" aria-hidden="true"></span>
+</span>

@@ -1,0 +1,3 @@
+{{/* usage: {{< button href="/getting-started/" style="blue" >}}Get Started{{< /button >}}; style is blue, red or plain */}}
+{{ $style := .Get "style" | default "plain" }}
+<a class="btn{{ if ne $style "plain" }} btn--{{ $style }}{{ end }}" href="{{ .Get "href" | relURL }}">{{ .Inner | .Page.RenderString }}</a>

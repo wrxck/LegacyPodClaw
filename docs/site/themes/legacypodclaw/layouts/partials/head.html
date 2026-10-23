@@ -3,5 +3,11 @@
 <title>{{ if not .IsHome }}{{ .Title }} — {{ end }}{{ .Site.Title }}</title>
 <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
 <meta name="author" content="{{ .Site.Params.author }}">
-<link rel="stylesheet" href="{{ "css/style.css" | relURL }}">
-<link rel="icon" href="{{ "favicon.ico" | relURL }}">
+<meta name="theme-color" content="#6d84a2">
+<meta name="color-scheme" content="light">
+{{/* one bundled, fingerprinted file keeps the page to a single css request */}}
+{{ $css := slice }}
+{{ range slice "base" "table" "controls" "home" "mobile" }}{{ $css = $css | append (resources.Get (printf "css/%s.css" .)) }}{{ end }}
+{{ $style := $css | resources.Concat "css/style.css" | minify | fingerprint }}
+<link rel="stylesheet" href="{{ $style.RelPermalink }}" integrity="{{ $style.Data.Integrity }}">
+<link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">

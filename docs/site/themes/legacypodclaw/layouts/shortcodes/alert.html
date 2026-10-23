@@ -1,0 +1,7 @@
+{{/* usage: {{< alert title="Warning" type="warning" >}}markdown{{< /alert >}}; type is note, tip, warning or danger */}}
+{{ $type := .Get "type" | default "note" }}
+{{ $title := .Get "title" | default (title $type) }}
+<aside class="alert alert--{{ $type }}" aria-label="{{ $title }}">
+  <p class="alert-title">{{ $title }}</p>
+  <div class="alert-body">{{ .Inner | .Page.RenderString (dict "display" "block") }}</div>
+</aside>

@@ -1,0 +1,17 @@
+{{/* original generic handheld frame drawn in css; the screen keeps the 2:3 ratio of a 640x960 capture */}}
+{{ $src := .src | default "" }}
+{{ $alt := .alt | default "" }}
+{{ $w := .width | default 640 }}
+{{ $h := .height | default 960 }}
+{{ $placeholder := eq $src "" }}
+{{ if $placeholder }}{{ $src = "img/screenshot-placeholder.svg" | relURL }}{{ end }}
+<figure class="device{{ if $placeholder }} device--placeholder{{ end }}">
+  <div class="device-frame">
+    <span class="device-speaker" aria-hidden="true"></span>
+    <div class="device-screen">
+      <img src="{{ $src }}" width="{{ $w }}" height="{{ $h }}" loading="lazy" decoding="async" alt="{{ if $placeholder }}Placeholder: screenshot not yet available{{ else }}{{ $alt }}{{ end }}">
+    </div>
+    <span class="device-button" aria-hidden="true"></span>
+  </div>
+  {{ with .caption }}<figcaption>{{ . }}</figcaption>{{ end }}
+</figure>

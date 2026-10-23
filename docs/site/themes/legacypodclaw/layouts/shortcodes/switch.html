@@ -1,0 +1,2 @@
+{{/* usage: {{< switch on="true" label="Voice input" >}} */}}
+{{ partial "switch.html" (dict "on" (eq (.Get "on" | default "false") "true") "label" (.Get "label")) }}

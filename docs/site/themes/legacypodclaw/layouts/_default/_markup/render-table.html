@@ -1,0 +1,15 @@
+{{/* wide tables scroll inside their own box so the page never scrolls sideways */}}
+<div class="table-scroll" tabindex="0" role="region" aria-label="Table, scroll sideways">
+<table>
+  <thead>
+    {{ range .THead }}
+    <tr>{{ range . }}<th{{ with .Alignment }} style="text-align: {{ . }}"{{ end }}>{{ .Text }}</th>{{ end }}</tr>
+    {{ end }}
+  </thead>
+  <tbody>
+    {{ range .TBody }}
+    <tr>{{ range . }}<td{{ with .Alignment }} style="text-align: {{ . }}"{{ end }}>{{ .Text }}</td>{{ end }}</tr>
+    {{ end }}
+  </tbody>
+</table>
+</div>

@@ -1,13 +1,14 @@
 {{ define "main" }}
-{{ if .Content }}
-<div class="section-intro">
-  {{ .Content }}
-</div>
+{{ with .Content }}
+<div class="card prose">{{ . }}</div>
 {{ end }}
 
-<div class="nav-cells">
-  {{ range .Pages.ByWeight }}
-  {{ partial "nav-cell.html" (dict "url" .Permalink "title" .Title "description" .Description) }}
-  {{ end }}
-</div>
+<section class="group-section">
+  <h2 class="group-header">In this section</h2>
+  <ul class="group">
+    {{ range .Pages.ByWeight }}
+    {{ partial "nav-cell.html" (dict "url" .RelPermalink "title" .Title "description" .Description) }}
+    {{ end }}
+  </ul>
+</section>
 {{ end }}
